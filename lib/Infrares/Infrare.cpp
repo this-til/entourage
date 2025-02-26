@@ -22,9 +22,9 @@ _Infrare::~_Infrare()
 }
 
 /***************************************************************
-** ¹¦ÄÜ£º	ºìÍâ·¢Éä¶Ë¿Ú³õÊ¼»¯
-** ²ÎÊı£º	ÎŞ²ÎÊı
-** ·µ»ØÖµ£º	ÎŞ
+** åŠŸèƒ½ï¼š	çº¢å¤–å‘å°„ç«¯å£åˆå§‹åŒ–
+** å‚æ•°ï¼š	æ— å‚æ•°
+** è¿”å›å€¼ï¼š	æ— 
 ****************************************************************/
 void _Infrare::Initialization(void)
 {
@@ -35,10 +35,10 @@ void _Infrare::Initialization(void)
 }
 
 /***************************************************************
-** ¹¦ÄÜ£º	ºìÍâ·¢Éä×Ó³ÌĞò
-** ²ÎÊı£º	*s£ºÖ¸ÏòÒª·¢ËÍµÄÊı¾İ
-**          *n£ºÊı¾İ³¤¶È
-** ·µ»ØÖµ£º	ÎŞ
+** åŠŸèƒ½ï¼š	çº¢å¤–å‘å°„å­ç¨‹åº
+** å‚æ•°ï¼š	*sï¼šæŒ‡å‘è¦å‘é€çš„æ•°æ®
+**          *nï¼šæ•°æ®é•¿åº¦
+** è¿”å›å€¼ï¼š	æ— 
 ****************************************************************/
 void _Infrare::Transmition(uint8_t *s, int n)
 {
@@ -55,27 +55,27 @@ void _Infrare::Transmition(uint8_t *s, int n)
 		for (j = 0; j<8; j++)
 		{
 			temp = (s[ i ] >> j) & 0x01;
-			if (temp == 0)						//·¢Éä0
+			if (temp == 0)						//å‘å°„0
 			{
 				digitalWrite(RITX_PIN, TXD_ON);
-				delayMicroseconds(500);			//ÑÓÊ±0.5ms
+				delayMicroseconds(500);			//å»¶æ—¶0.5ms
 				digitalWrite(RITX_PIN,TXD_OFF);
-				delayMicroseconds(500);			//ÑÓÊ±0.5ms
+				delayMicroseconds(500);			//å»¶æ—¶0.5ms
 			}
-			if (temp == 1)						//·¢Éä1
+			if (temp == 1)						//å‘å°„1
 			{
 				digitalWrite(RITX_PIN, TXD_ON);
-				delayMicroseconds(500);			//ÑÓÊ±0.5ms
+				delayMicroseconds(500);			//å»¶æ—¶0.5ms
 				digitalWrite(RITX_PIN, TXD_OFF);
 				delayMicroseconds(1000);
-				delayMicroseconds(800);			//ÑÓÊ±1.69ms  690
+				delayMicroseconds(800);			//å»¶æ—¶1.69ms  690
 
 			}
 		}
 	}
-	digitalWrite(RITX_PIN, TXD_ON);				//½áÊø
-	delayMicroseconds(560);						//ÑÓÊ±0.56ms
-	digitalWrite(RITX_PIN, TXD_OFF);			//¹Ø±ÕºìÍâ·¢Éä
+	digitalWrite(RITX_PIN, TXD_ON);				//ç»“æŸ
+	delayMicroseconds(560);						//å»¶æ—¶0.56ms
+	digitalWrite(RITX_PIN, TXD_OFF);			//å…³é—­çº¢å¤–å‘å°„
 }
 
 

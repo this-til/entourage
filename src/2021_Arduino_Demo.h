@@ -15,7 +15,7 @@
 #include <Command.h>
 #include <BEEP.h>
 #include <Infrare.h>
-#include <Ultrasonic.h>
+#include <UltrasonicUtil.h>
 #include <BKRC_Voice.h>
 #include <Arduino.h>
 

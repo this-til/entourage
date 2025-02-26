@@ -205,19 +205,6 @@ void K210_Send(int8_t angle) {
     ExtSRAMInterface.ExMem_Write_Bytes(0x6008, qrdi1_buf, 8);
 }
 
-//双闪+报警响三次
-void LED_shine()  //双闪模式
-{
-    int time = 0;
-    for (time = 0; time < 10; time++) {
-        LED.LeftTurnOn();
-        LED.RightTurnOn();
-        delay(500);
-        LED.LeftTurnOff();
-        LED.RightTurnOff();
-    }
-}
-
 void Beep_time3() {
     CoreBeep.Initialization();
     CoreBeep.TurnOn();
@@ -232,26 +219,6 @@ void Beep_time3() {
     delay(100);
     CoreBeep.TurnOff();
     LED_shine();
-}
-
-
-uint8_t servo_buf[8] = {0x55, 0x02, 0x91, 0x03, 0x00, 0x00, 0x00, 0xBB};  // 给OpenMV发送舵机角度
-/*
-功    能：舵机角度控制函数
-参    数：angle: 舵机角度，范围-80至+40，0度垂直于车身
-返 回 值：无
-*/
-void Servo_Control(int8_t angle) {
-    if (angle >= 0) {
-        servo_buf[4] = 0x2B;
-    } else {
-        servo_buf[4] = 0x2D;
-    }
-    servo_buf[5] = abs(angle);    //开始识别
-    Command.Judgment(servo_buf);  //计算校验和
-    ExtSRAMInterface.ExMem_Write_Bytes(0x6008, servo_buf, 8);
-    delay(1000);
-    // Serial.write(servo_buf,8);
 }
 
 

@@ -2,11 +2,7 @@
 
 /////////////////////////////////////////////////////////////////////////////////
 
-#include <HardwareSerial.h>
-#include <Arduino.h>
-#include "DCMotor.h"
-#include "BEEP.h"
-#include "ExtSRAMInterface.h"
+#include "QrUtil.h"
 
 /*
 二维码颜色功能识别
@@ -127,7 +123,7 @@ void Road_QR_Test(void) {
     int numberOfQRCodesReceived = 0;  // 已接收的二维码数量
     int i = 0, red = 0, bulu = 0, green = 0;;  // 超时计数器
     delay(100);
-    Servo_Control(10);
+    car_setCameraSteeringGearAngle(10);
     delay(500);
     DCMotor.TurnLeft_Code(40, 90);
     // 开启二维码识别

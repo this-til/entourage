@@ -16,25 +16,25 @@ _ExtSRAMInterface::~_ExtSRAMInterface()
 }
 
 /************************************************************************************************************
-¡¾º¯ Êý Ãû¡¿£º  Initialization		Íâ²¿×ÜÏß½Ó¿Ú³õÊ¼»¯º¯Êý
-¡¾²ÎÊýËµÃ÷¡¿£º	ÎÞ
-¡¾·µ »Ø Öµ¡¿£º	ÎÞ
-¡¾¼ò    Àý¡¿£º	Initialization();	³õÊ¼»¯Íâ²¿×ÜÏß½Ó¿Ú
+ã€å‡½ æ•° åã€‘ï¼š  Initialization		å¤–éƒ¨æ€»çº¿æŽ¥å£åˆå§‹åŒ–å‡½æ•°
+ã€å‚æ•°è¯´æ˜Žã€‘ï¼š	æ— 
+ã€è¿” å›ž å€¼ã€‘ï¼š	æ— 
+ã€ç®€    ä¾‹ã€‘ï¼š	Initialization();	åˆå§‹åŒ–å¤–éƒ¨æ€»çº¿æŽ¥å£
 ************************************************************************************************************/
 void _ExtSRAMInterface::Initialization(void)
 {
 	XMCRA = 0x00;
 	XMCRB = 0x00;
 	XMCRA |= _BV(SRW10);
-	XMCRA |= _BV(SRE);	/*ÕâÒ»Î»Ê¹ÄÜÍâ²¿SRAM*/
+	XMCRA |= _BV(SRE);	/*è¿™ä¸€ä½ä½¿èƒ½å¤–éƒ¨SRAM*/
 }
 
 /************************************************************************************************************
-¡¾º¯ Êý Ãû¡¿£º  ExMem_Write					ÏòÍâ²¿×ÜÏßÐ´Ò»¸ö×Ö½ÚÊý¾Ýº¯Êý
-¡¾²ÎÊýËµÃ÷¡¿£º	add	£º						Íâ²¿×ÜÏßµØÖ·
-				dat	£º						ÏòÍâ²¿×ÜÏßÐ´µÄÊý¾Ý
-¡¾·µ »Ø Öµ¡¿£º	ÎÞ
-¡¾¼ò    Àý¡¿£º	ExMem_Write(0x6000,0x55);	ÏòÍâ²¿×ÜÏß½Ó¿ÚµØÖ·Îª0x6000Ð´0x55Êý¾Ý
+ã€å‡½ æ•° åã€‘ï¼š  ExMem_Write					å‘å¤–éƒ¨æ€»çº¿å†™ä¸€ä¸ªå­—èŠ‚æ•°æ®å‡½æ•°
+ã€å‚æ•°è¯´æ˜Žã€‘ï¼š	add	ï¼š						å¤–éƒ¨æ€»çº¿åœ°å€
+				dat	ï¼š						å‘å¤–éƒ¨æ€»çº¿å†™çš„æ•°æ®
+ã€è¿” å›ž å€¼ã€‘ï¼š	æ— 
+ã€ç®€    ä¾‹ã€‘ï¼š	ExMem_Write(0x6000,0x55);	å‘å¤–éƒ¨æ€»çº¿æŽ¥å£åœ°å€ä¸º0x6000å†™0x55æ•°æ®
 ************************************************************************************************************/
 void _ExtSRAMInterface::ExMem_Write(uint16_t add, uint8_t dat)
 {
@@ -52,13 +52,13 @@ void _ExtSRAMInterface::ExMem_JudgeWrite(uint16_t add, uint8_t dat)
 	} while ((ExtSRAMInterface.ExMem_Read(add) != dat) && ((millis() - t) < 1000));
 }
 /************************************************************************************************************
-¡¾º¯ Êý Ãû¡¿£º  ExMem_Write_Btyes				Á¬ÐøÏòÍâ²¿×ÜÏßÐ´Êý¾Ýº¯Êý
-¡¾²ÎÊýËµÃ÷¡¿£º	BaseAdd	£º						ÏòÍâ²¿×ÜÏßÐ´Êý¾ÝµÄµÚÒ»¸öµØÖ·
-				Tbuf	£º						ÏòÍâ²¿×ÜÏßÐ´Êý¾ÝµÄÊý×é
-				len		£º						Êý×éµÄ³¤¶È
-¡¾·µ »Ø Öµ¡¿£º	ÎÞ
-¡¾¼ò    Àý¡¿£º	uint8_t Tbuf[8] = {0x00};
-				ExMem_Write_Btyes(0x6000,Tbuf,8);	ÏòÍâ²¿×ÜÏßÐ´³¤¶ÈÎª8µÄÊý×éÊý¾Ý
+ã€å‡½ æ•° åã€‘ï¼š  ExMem_Write_Btyes				è¿žç»­å‘å¤–éƒ¨æ€»çº¿å†™æ•°æ®å‡½æ•°
+ã€å‚æ•°è¯´æ˜Žã€‘ï¼š	BaseAdd	ï¼š						å‘å¤–éƒ¨æ€»çº¿å†™æ•°æ®çš„ç¬¬ä¸€ä¸ªåœ°å€
+				Tbuf	ï¼š						å‘å¤–éƒ¨æ€»çº¿å†™æ•°æ®çš„æ•°ç»„
+				len		ï¼š						æ•°ç»„çš„é•¿åº¦
+ã€è¿” å›ž å€¼ã€‘ï¼š	æ— 
+ã€ç®€    ä¾‹ã€‘ï¼š	uint8_t Tbuf[8] = {0x00};
+				ExMem_Write_Btyes(0x6000,Tbuf,8);	å‘å¤–éƒ¨æ€»çº¿å†™é•¿åº¦ä¸º8çš„æ•°ç»„æ•°æ®
 ************************************************************************************************************/
 void _ExtSRAMInterface::ExMem_Write_Bytes(uint8_t *Tbuf, uint8_t len)
 {
@@ -86,10 +86,10 @@ void _ExtSRAMInterface::ExMem_Write_Bytes(uint16_t BaseAdd, uint8_t *Tbuf, uint8
 }
 
 /************************************************************************************************************
-¡¾º¯ Êý Ãû¡¿£º  ExMem_Read					ÏòÍâ²¿×ÜÏß¶ÁÒ»¸ö×Ö½ÚÊý¾Ýº¯Êý
-¡¾²ÎÊýËµÃ÷¡¿£º	add	£º						Íâ²¿×ÜÏß¶ÁµØÖ·
-¡¾·µ »Ø Öµ¡¿£º	exm_p[ add ]				·µ»ØÍâ²¿×ÜÏßµØÖ·ÎªaddµÄÊý¾Ý
-¡¾¼ò    Àý¡¿£º	tp = ExMem_Read(0x6000);	¶ÁÈ¡Íâ²¿×ÜÏß½Ó¿ÚµØÖ·Îª0x6000µÄÊý¾Ý
+ã€å‡½ æ•° åã€‘ï¼š  ExMem_Read					å‘å¤–éƒ¨æ€»çº¿è¯»ä¸€ä¸ªå­—èŠ‚æ•°æ®å‡½æ•°
+ã€å‚æ•°è¯´æ˜Žã€‘ï¼š	add	ï¼š						å¤–éƒ¨æ€»çº¿è¯»åœ°å€
+ã€è¿” å›ž å€¼ã€‘ï¼š	exm_p[ add ]				è¿”å›žå¤–éƒ¨æ€»çº¿åœ°å€ä¸ºaddçš„æ•°æ®
+ã€ç®€    ä¾‹ã€‘ï¼š	tp = ExMem_Read(0x6000);	è¯»å–å¤–éƒ¨æ€»çº¿æŽ¥å£åœ°å€ä¸º0x6000çš„æ•°æ®
 ************************************************************************************************************/
 uint8_t _ExtSRAMInterface::ExMem_Read(uint16_t add)
 {
@@ -100,13 +100,13 @@ uint8_t _ExtSRAMInterface::ExMem_Read(uint16_t add)
 }
 
 /************************************************************************************************************
-¡¾º¯ Êý Ãû¡¿£º  ExMem_Read_Bytes				Á¬ÐøÏòÍâ²¿×ÜÏß¶ÁÈ¡Êý¾Ýº¯Êý
-¡¾²ÎÊýËµÃ÷¡¿£º	BaseAdd	£º						ÏòÍâ²¿×ÜÏß¶ÁÊý¾ÝµÄµÚÒ»¸öµØÖ·
-				Tbuf	£º						¶ÁÈ¡Íâ²¿×ÜÏßÐ´Êý¾Ý´æ·ÅµÄÊý×é
-				len		£º						Êý×éµÄ³¤¶È
-¡¾·µ »Ø Öµ¡¿£º	ÎÞ
-¡¾¼ò    Àý¡¿£º	uint8_t Rbuf[8] = {0x00};
-				ExMem_Read_Bytes(0x6000,Rbuf,8);	ÏòÍâ²¿×ÜÏßÆðÊ¼µØÖ·Îª0x6000¿ªÊ¼¶ÁÈ¡8¸öÊý¾Ý£¬´æ·ÅÓÚRbufÖÐ
+ã€å‡½ æ•° åã€‘ï¼š  ExMem_Read_Bytes				è¿žç»­å‘å¤–éƒ¨æ€»çº¿è¯»å–æ•°æ®å‡½æ•°
+ã€å‚æ•°è¯´æ˜Žã€‘ï¼š	BaseAdd	ï¼š						å‘å¤–éƒ¨æ€»çº¿è¯»æ•°æ®çš„ç¬¬ä¸€ä¸ªåœ°å€
+				Tbuf	ï¼š						è¯»å–å¤–éƒ¨æ€»çº¿å†™æ•°æ®å­˜æ”¾çš„æ•°ç»„
+				len		ï¼š						æ•°ç»„çš„é•¿åº¦
+ã€è¿” å›ž å€¼ã€‘ï¼š	æ— 
+ã€ç®€    ä¾‹ã€‘ï¼š	uint8_t Rbuf[8] = {0x00};
+				ExMem_Read_Bytes(0x6000,Rbuf,8);	å‘å¤–éƒ¨æ€»çº¿èµ·å§‹åœ°å€ä¸º0x6000å¼€å§‹è¯»å–8ä¸ªæ•°æ®ï¼Œå­˜æ”¾äºŽRbufä¸­
 ************************************************************************************************************/
 void _ExtSRAMInterface::ExMem_Read_Bytes(uint8_t *Rbuf, uint8_t len)
 {
