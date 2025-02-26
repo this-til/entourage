@@ -84,3 +84,31 @@ void BusStop::getWeatherTemperature(Weather* weather, uint8_t* temperature) {
         *temperature = buf[4];
     }
 }
+
+void BusStop::startSynthesizingLanguage(uint8_t* data, uint16_t len, TextEncodingFormat textEncodingFormat) {
+    uint16_t size = 5 + len;
+    uint8_t* buf = new uint8_t[size];
+
+    buf[0] = 0xFD;
+
+    buf[1] = len >> 8;
+    buf[2] = len;
+    buf[3] = 0x01;
+    buf[4] = (uint8_t) textEncodingFormat;
+
+    for (int i = 0; i < len; ++i) {
+        buf[5 + i] = data[i];
+    }
+
+    ExtSRAMInterface.ExMem_Write_Bytes(BUS_BASE_ADD, buf, size);
+    delete[] buf;
+
+}
+
+void BusStop::pauseSynthesizingLanguage() {
+
+}
+
+void BusStop::recoverSynthesizingLanguage() {
+
+}

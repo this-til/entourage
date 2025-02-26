@@ -39,6 +39,16 @@ enum Weather {
     OVERCAST_SKY = 0x05,
 };
 
+/***
+ * 文本编码格式
+ */
+enum TextEncodingFormat {
+    GB2312 = 0x00,
+    GBK = 0x01,
+    BIG5 = 0x02,
+    Unicode = 0x03,
+};
+
 class BusStop {
 public:
     BusStop(uint8_t id);
@@ -97,6 +107,21 @@ public:
      * 请求回传天气数据与温度数据
      */
     void getWeatherTemperature(Weather* weather, uint8_t* temperature);
+
+    /***
+     * 开始合成语言
+     */
+    void startSynthesizingLanguage(uint8_t* data, uint16_t len, TextEncodingFormat textEncodingFormat);
+
+    /***
+       * 暂停合成语言
+       */
+    void pauseSynthesizingLanguage();
+
+    /***
+       * 恢复合成语言
+       */
+    void recoverSynthesizingLanguage();
 
 private:
     uint8_t id;
