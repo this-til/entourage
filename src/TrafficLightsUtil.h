@@ -5,9 +5,7 @@
 #ifndef ENTOURAGE_CLION_TRAFFICLIGHTSUTIL_H
 #define ENTOURAGE_CLION_TRAFFICLIGHTSUTIL_H
 
-#include <Arduino.h>
-#include "Command.h"
-#include "ExtSRAMInterface.h"
+#include <def.h>
 
 
 #endif //ENTOURAGE_CLION_TRAFFICLIGHTSUTIL_H

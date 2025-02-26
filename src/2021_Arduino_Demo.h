@@ -5,19 +5,7 @@
 #ifndef ENTOURAGE_CLION_2021_ARDUINO_DEMO_H
 #define ENTOURAGE_CLION_2021_ARDUINO_DEMO_H
 
-#include <DCMotor.h>
-#include <CoreLED.h>
-#include <CoreKEY.h>
-#include <CoreBeep.h>
-#include <ExtSRAMInterface.h>
-#include <LED.h>
-#include <BH1750.h>
-#include <Command.h>
-#include <BEEP.h>
-#include <Infrare.h>
-#include <UltrasonicUtil.h>
-#include <BKRC_Voice.h>
-#include <Arduino.h>
+#include "def.h"
 
 
 void ZigBeeRx_Handler(uint8_t* mar);

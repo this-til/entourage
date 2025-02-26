@@ -5,12 +5,8 @@
 #ifndef ENTOURAGE_CLION_ULTRASONICUTIL_H
 #define ENTOURAGE_CLION_ULTRASONICUTIL_H
 
-#include <Arduino.h>
-#include "DCMotor.h"
-#include "Command.h"
-#include "ExtSRAMInterface.h"
-#include "Ultrasonic.h"
-#include "def.h"
+
+#include <def.h>
 
 
 /***
@@ -18,7 +14,6 @@
  * @return 测得距离
  */
 double ultrasonic_ranging(int sys = CM, int rangeFrequency = 5, int wait = 30);
-
 
 /***
  * 通过超声波测距控制测距

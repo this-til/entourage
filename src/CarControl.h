@@ -5,20 +5,7 @@
 #ifndef ENTOURAGE_CLION_CARCONTROL_H
 #define ENTOURAGE_CLION_CARCONTROL_H
 
-
-#include <DCMotor.h>
-#include <CoreLED.h>
-#include <CoreKEY.h>
-#include <CoreBeep.h>
-#include <ExtSRAMInterface.h>
-#include <LED.h>
-#include <BH1750.h>
-#include <Command.h>
-#include <BEEP.h>
-#include <Infrare.h>
-#include <UltrasonicUtil.h>
-#include <BKRC_Voice.h>
-#include <Arduino.h>
+#include <def.h>
 
 /***
  * 设置摄像头舵机角度
