@@ -1,3 +1,4 @@
+/*
 #include "Infrare.h"
 
 //================立体标志物================================
@@ -75,4 +76,4 @@ void LTBZW(String str) {
     delay(500);
     TEXT_display2(str.substring(4).c_str());
     delay(500);
-}
+}*/

@@ -12,7 +12,7 @@ double ultrasonic_ranging(int sys, int rangeFrequency, int wait) {
 }
 
 
-void ultrasonic_adjustDistance(uint8_t carSeep, uint8_t targetDistance, double errorMargin, ulong controlTime_ms, int wait) {
+void ultrasonic_adjustDistance(uint8_t carSeep, uint8_t targetDistance, double errorMargin, unsigned long controlTime_ms, int wait) {
     ulong startTime = millis();
     while (millis() - startTime >= controlTime_ms) {
         DCMotor.Stop();
@@ -36,6 +36,7 @@ uint8_t LED_display_buf[] = {0x55, 0x04, 0x04, 0x00, 0x00, 0x00, 0x00, 0xbb};
 /*
 超声波测距
 */
+/*
 void chaoShengBo(void) {
     distance_new = 0;                             // 重置距离为零
     for (csbcjcs = 0; csbcjcs < 20; csbcjcs++) {  // 进行20次测距，并累加结果
@@ -52,10 +53,11 @@ void chaoShengBo(void) {
     int geredthDigit = intValue % 10000 / 100;  // 获取十位数字
     Serial.println(geredthDigit);               // 打印十位数字到串口
 
-    // 将百位和十位数字存储到 LED 显示缓冲区中
+    // 将百位和十位数字存储到 carLight 显示缓冲区中
     LED_display_buf[4] = hundredthDigit;  // 存储百位数字
     LED_display_buf[5] = geredthDigit;    // 存储十位数字
 
-    Command.Judgment(LED_display_buf);                               // 调用命令处理函数，处理 LED 显示缓冲区
+    Command.Judgment(LED_display_buf);                               // 调用命令处理函数，处理 carLight 显示缓冲区
     ExtSRAMInterface.ExMem_Write_Bytes(0x6008, LED_display_buf, 8);  // 将处理结果写入外部存储器
 }
+*/

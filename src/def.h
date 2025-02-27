@@ -21,12 +21,10 @@
 
 #include "UltrasonicUtil.h"
 #include "2021_Arduino_Demo.h"
-#include "device/BarrierGate.h"
 #include "CarControl.h"
-#include "device/Carport.h"
 #include "QrUtil.h"
 #include "TrafficLightsUtil.h"
-#include "UltrasonicUtil.h"
+#include "Device.h"
 
 // 标准无符号类型
 #define uchar  unsigned char

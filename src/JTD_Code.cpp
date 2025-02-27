@@ -1,12 +1,15 @@
+/*
 #include <Arduino.h>
 #include "Command.h"
 #include "ExtSRAMInterface.h"
 
+*/
 /*
 交通灯A进入识别模式
 参数：无
 返回值：无
-*/
+*//*
+
 uint8_t trafficA_enter_command[] = {0x55, 0x0E, 0x01, 0x00, 0x00, 0x00, 0x00, 0xBB};
 
 void GateA_enter_Test(void) {
@@ -14,11 +17,13 @@ void GateA_enter_Test(void) {
     ExtSRAMInterface.ExMem_Write_Bytes(0x6008, trafficA_enter_command, 8);
 }
 
+*/
 /*
 交通灯A颜色确认测试
 参数：颜色 01红色 02绿色 03黄色
 返回值：无
-*/
+*//*
+
 uint8_t trafficA_color_command[] = {0x55, 0x0E, 0x02, 0x00, 0x00, 0x00, 0x00, 0xBB};
 
 void Road_GateA_Test(uint8_t color) {
@@ -27,11 +32,13 @@ void Road_GateA_Test(uint8_t color) {
     ExtSRAMInterface.ExMem_Write_Bytes(0x6008, trafficA_color_command, 8);
 }
 
+*/
 /*
 交通灯B进入识别模式
 参数：无
 返回值：无
-*/
+*//*
+
 uint8_t trafficB_enter_command[] = {0x55, 0x0F, 0x01, 0x00, 0x00, 0x00, 0x00, 0xBB};
 
 void GateB_enter_Test(void) {
@@ -39,11 +46,13 @@ void GateB_enter_Test(void) {
     ExtSRAMInterface.ExMem_Write_Bytes(0x6008, trafficB_enter_command, 8);
 }
 
+*/
 /*
 交通灯B颜色确认测试
 参数：颜色 01红色 02绿色 03黄色
 返回值：无
-*/
+*//*
+
 uint8_t trafficB_color_command[] = {0x55, 0x0F, 0x02, 0x00, 0x00, 0x00, 0x00, 0xBB};
 
 void Road_GateB_Test(uint8_t color) {
@@ -52,11 +61,13 @@ void Road_GateB_Test(uint8_t color) {
     ExtSRAMInterface.ExMem_Write_Bytes(0x6008, trafficB_color_command, 8);
 }
 
+*/
 /*
 交通灯C进入识别模式
 参数：无
 返回值：无
-*/
+*//*
+
 uint8_t trafficC_enter_command[] = {0x55, 0x13, 0x01, 0x00, 0x00, 0x00, 0x00, 0xBB};
 
 void GateC_enter_Test(void) {
@@ -64,11 +75,13 @@ void GateC_enter_Test(void) {
     ExtSRAMInterface.ExMem_Write_Bytes(0x6008, trafficC_enter_command, 8);
 }
 
+*/
 /*
 交通灯C颜色确认测试
 参数：颜色 01红色 02绿色 03黄色
 返回值：无
-*/
+*//*
+
 uint8_t trafficC_color_command[] = {0x55, 0x13, 0x02, 0x00, 0x00, 0x00, 0x00, 0xBB};
 
 void Road_GateC_Test(uint8_t color) {
@@ -78,9 +91,11 @@ void Road_GateC_Test(uint8_t color) {
 }
 
 
+*/
 /*
 交通灯识别 交通灯A
-*/
+*//*
+
 void Road_Traffic_ATest(void) {
     delay(500);
     Servo_Control(20);
@@ -143,9 +158,11 @@ void Road_Traffic_ATest(void) {
 }
 
 
+*/
 /*
 交通灯识别 交通灯B
-*/
+*//*
+
 void Road_Traffic_BTest(void) {
     delay(500);
     Servo_Control(20);
@@ -225,9 +242,11 @@ void Road_Traffic_BTest(void) {
 
 
 
+*/
 /*
 交通灯识别 交通灯C
-*/
+*//*
+
 void Road_Traffic_CTest(void) {
     int GateC = 0;
     GateC_enter_Test();  // 交通灯C进入识别模式
@@ -284,3 +303,4 @@ void Road_Traffic_CTest(void) {
 }
 
 
+*/

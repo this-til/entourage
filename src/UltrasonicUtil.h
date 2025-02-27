@@ -24,6 +24,6 @@ double ultrasonic_ranging(int sys = CM, int rangeFrequency = 5, int wait = 30);
  * @param controlTime_ms 调整时间，如果超过时间无论有没有到指定距离都将退出函数
  * @return 如果true表示调整到指定距离
  */
-void ultrasonic_adjustDistance(uint8_t carSeep, uint8_t targetDistance, double errorMargin = 0.2, ulong controlTime_ms = 2000, int wait = 30);
+void ultrasonic_adjustDistance(uint8_t carSeep, uint8_t targetDistance, double errorMargin = 0.2, unsigned long controlTime_ms = 2000, int wait = 30);
 
 #endif //ENTOURAGE_CLION_ULTRASONICUTIL_H

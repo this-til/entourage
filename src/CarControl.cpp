@@ -25,10 +25,10 @@ void car_setCameraSteeringGearAngle(int8_t angle) {
  */
 void car_ledShine(int number, int wait) {
     for (int i = 0; i < number; ++i) {
-        LED.LeftTurnOn();
-        LED.RightTurnOn();
+        carLight.LeftTurnOn();
+        carLight.RightTurnOn();
         delay(wait);
-        LED.LeftTurnOff();
-        LED.RightTurnOff();
+        carLight.LeftTurnOff();
+        carLight.RightTurnOff();
     }
 }

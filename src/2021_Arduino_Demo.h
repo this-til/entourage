@@ -7,6 +7,9 @@
 
 #include "def.h"
 
+void l_setup();
+
+void l_loop();
 
 void ZigBeeRx_Handler(uint8_t* mar);
 // 处理ZigBee接收数据的函数，参数为指向uint8_t数组的指针

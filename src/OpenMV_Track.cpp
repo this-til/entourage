@@ -1,3 +1,4 @@
+/*
 #include <Arduino.h>
 #include "Command.h"
 #include "ExtSRAMInterface.h"
@@ -9,11 +10,13 @@ char angle = 0;
 
 uint8_t trackdi_buf[8] = {0x55, 0x02, 0x91, 0x00, 0x00, 0x00, 0x00, 0xBB};
 
+*/
 /*
 功    能：OpenMV巡线启动函数
 参    数：无
 返 回 值：无
-*/
+*//*
+
 void OpenMVTrack_Disc_StartUp(void) {
     //   Servo_Control(-75);
     trackdi_buf[3] = 0x01;          //开始识别
@@ -21,11 +24,13 @@ void OpenMVTrack_Disc_StartUp(void) {
     ExtSRAMInterface.ExMem_Write_Bytes(0x6008, trackdi_buf, 8);
 }
 
+*/
 /*
 功    能：关闭OpenMV巡线函数
 参    数：无
 返 回 值：无
-*/
+*//*
+
 void OpenMVTrack_Disc_CloseUp(void) {
     //   Servo_Control(0);
     trackdi_buf[3] = 0x02;          //关闭识别
@@ -35,11 +40,13 @@ void OpenMVTrack_Disc_CloseUp(void) {
     Serial.print("SS");
 }
 
+*/
 /*
 功    能：开启OpenMV转弯巡线启动函数
 参    数：无
 返 回 值：无
-*/
+*//*
+
 void OpenMVTrack_Disc_StartUpZW(void) {
     //   Servo_Control(-75);
     trackdi_buf[3] = 0x04;          //开始识别
@@ -47,11 +54,13 @@ void OpenMVTrack_Disc_StartUpZW(void) {
     ExtSRAMInterface.ExMem_Write_Bytes(0x6008, trackdi_buf, 8);
 }
 
+*/
 /*
 功    能：关闭OpenMV转弯巡线函数
 参    数：无
 返 回 值：无
-*/
+*//*
+
 void OpenMVTrack_Disc_CloseUpZW(void) {
     //   Servo_Control(0);
     trackdi_buf[3] = 0x05;          //关闭识别
@@ -376,3 +385,4 @@ void Servoangle_control(uint8_t data) {
     delay(100);
     Servo_Control(angle);
 }
+*/

@@ -12,9 +12,9 @@ static uint8_t TrafficA_Yellow[8] = {0x55, 0x0E, 0x02, 0x03, 0x00, 0x00, 0x05, 0
 
 static uint8_t Gate_Open[8] = {0x55, 0x03, 0x01, 0x01, 0x00, 0x00, 0x02, 0xBB};  // 道闸 开启
 
-static uint8_t Light_plus1[4] = {0x00, 0xFF, 0x0C, ~(0x0C)};  // 智能路灯 光源挡位加1
-static uint8_t Light_plus2[4] = {0x00, 0xFF, 0x18, ~(0x18)};  // 智能路灯 光源挡位加2
-static uint8_t Light_plus3[4] = {0x00, 0xFF, 0x5E, ~(0x5E)};  // 智能路灯 光源挡位加3
+static uint8_t Light_plus1[4] = {0x00, 0xFF, 0x0C, static_cast<uint8_t>(~(0x0C))};  // 智能路灯 光源挡位加1
+static uint8_t Light_plus2[4] = {0x00, 0xFF, 0x18, static_cast<uint8_t>(~(0x18))};  // 智能路灯 光源挡位加2
+static uint8_t Light_plus3[4] = {0x00, 0xFF, 0x5E, static_cast<uint8_t>(~(0x5E))};  // 智能路灯 光源挡位加3
 
 static uint8_t SEG_TimOpen[8] = {0x55, 0x04, 0x03, 0x01, 0x00, 0x00, 0x04, 0xBB};   // LED显示 计时开启
 static uint8_t SMG_TimClose[8] = {0x55, 0x04, 0x03, 0x00, 0x00, 0x00, 0x03, 0xBB};  // LED显示 计时关闭
@@ -97,8 +97,15 @@ uint8_t Data_Flag;
 uint8_t Data_Length;
 uint8_t Data_OTABuf[40];
 
+/*void setup() {
 
-void setup() {
+}
+
+void loop() {
+
+}*/
+
+void l_setup() {
     Serial.begin(115200);
     // 初始化串口通信，波特率115200
     CoreLED.Initialization();
@@ -109,7 +116,7 @@ void setup() {
     // 初始化CoreBeep模块
     ExtSRAMInterface.Initialization();
     // 初始化ExtSRAMInterface模块
-    LED.Initialization();
+    carLight.Initialization();
     // 初始化LED模块
     BH1750.Initialization();
     // 初始化BH1750模块
@@ -134,8 +141,9 @@ void setup() {
     // 初始化Tcount变量为0
 }
 
+int8_t a;
 
-void loop() {
+void l_loop() {
     uint8_t si = 0;
     frisrtime = millis();
 
@@ -184,8 +192,29 @@ void loop() {
     } else if (sendflag == 1) {
         Tcount += (millis() - frisrtime);
     }
+
+    a++;
+    a = a > 30 ? -80 : a;
+    k230.setCameraSteeringGearAngle(a);
+
 }
 
+
+void ZigBeeRx_Handler(uint8_t* mar) {}
+
+void OpenMVRx_Handler(uint8_t* mac) {}
+
+void Analyze_Handle(uint8_t com) {}
+
+void KEY_Handler(uint8_t k_value) {}
+
+String DecIntToHexStr(long long num) {}
+
+void OpenMVTrack_Disc_StartUp(void) {}
+
+void OpenMVTrack_Disc_CloseUp(void) {}
+
+void Servoangle_control(uint8_t data) {}
 
 uint8_t qrdi1_buf[8] = {0x55, 0x02, 0x92, 0x00, 0x00, 0x00, 0x00, 0xBB};  // 给OpenMV发送识别二维码
 //********************************************************************************
@@ -218,7 +247,6 @@ void Beep_time3() {
     CoreBeep.TurnOn();
     delay(100);
     CoreBeep.TurnOff();
-    LED_shine();
 }
 
 
@@ -367,6 +395,8 @@ void shuju_Test(void) {
     }
 }
 
+
+
 // void KEY_Handler(uint8_t k_value) {
 //   switch (k_value) {
 //     case 1:
@@ -412,40 +442,7 @@ void shuju_Test(void) {
 // }
 
 
-// void KEY_Handler(uint8_t k_value) {
-//   switch (k_value) {
-//     case 1:
-//     //抬头红绿灯
-//       BEEP.TurnOn();
-//       delay(50);
-//       BEEP.TurnOff();
-//       Servo_Control(20);      //循迹
-//       break;
-//     case 2:
-//       BEEP.TurnOn();
-//       delay(50);
-//       BEEP.TurnOff();
-//       Servo_Control(-55);      //循迹
-//       break;
-//     case 3:
-//     //拍照
-//       BEEP.TurnOn();
-//       delay(50);
-//       BEEP.TurnOff();
-//       K210_Send(0x08);
-//       // Road_Traffic_ATest();
-//       break;
-//     case 4:
-//     //右转
-//       BEEP.TurnOn();
-//       delay(50);
-//       BEEP.TurnOff();
-//       K210_Send(0x05);
-//       // Road_QR_Test();
-//       break;
-//   }
-// }
-
+/*
 void KEY_Handler(uint8_t k_value) {
     switch (k_value) {
         case 1:
@@ -557,6 +554,7 @@ void KEY_Handler(uint8_t k_value) {
             break;
     }
 }
+*/
 
 
 
@@ -839,12 +837,12 @@ void KEY_Handler(uint8_t k_value) {
 
 
 
-
 /*
+*//*
 功    能：从车ZigBee接收，处理函数
 参    数：*mar 接收数据指针
 返 回 值：无
-*/
+*//*
 void ZigBeeRx_Handler(uint8_t* mar) {
     switch (mar[1]) {
         case 0x02:  //主车
@@ -882,11 +880,11 @@ void ZigBeeRx_Handler(uint8_t* mar) {
     }
 }
 
-/*
+*//*
 功    能：从车接收 机器视觉Camera返回数据
 参    数：*mac 接收数据指针
 返 回 值：无
-*/
+*//*
 void OpenMVRx_Handler(uint8_t* mac) {
     switch (mac[2]) {
         case 0x91:  //保留
@@ -900,11 +898,11 @@ void OpenMVRx_Handler(uint8_t* mac) {
     }
 }
 
-/**
+*//**
 功    能：从车任务处理函数
 参    数：com 主指令
 返 回 值：无
-*/
+*//*
 void Analyze_Handler(uint8_t* com) {
     Serial.println(com[2], HEX);
     switch (com[2]) {
@@ -949,10 +947,10 @@ void Analyze_Handler(uint8_t* com) {
             Infrare.Transmition(infrare_com, 6);
             break;
         case 0x20:  //左右转向灯
-            if (com[3] == 0x01) LED.LeftTurnOn();
-            else LED.LeftTurnOff();
-            if (com[4] == 0x01) LED.RightTurnOn();
-            else LED.RightTurnOff();
+            if (com[3] == 0x01) carLight.LeftTurnOn();
+            else carLight.LeftTurnOff();
+            if (com[4] == 0x01) carLight.RightTurnOn();
+            else carLight.RightTurnOff();
             break;
         case 0x30:  //蜂鸣器
             if (com[3] == 0x01) BEEP.TurnOn();
@@ -1090,4 +1088,4 @@ void Analyze_Handler(uint8_t* com) {
         default:
             break;
     }
-}
+}*/

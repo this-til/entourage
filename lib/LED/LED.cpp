@@ -4,14 +4,12 @@
 
 #include "LED.h"
 
-_LED LED;
+_LED carLight;
 
-_LED::_LED()
-{
+_LED::_LED() {
 }
 
-_LED::~_LED()
-{
+_LED::~_LED() {
 }
 
 /************************************************************************************************************
@@ -20,14 +18,13 @@ _LED::~_LED()
 【返 回 值】：	无
 【简    例】：	Initialization();	初始化任务板LED引脚
 ************************************************************************************************************/
-void _LED::Initialization(void)
-{
-	//L_pin = _L_pin;
-	//R_pin = _R_pin;
-	pinMode(LED_PIN_L, OUTPUT);
-	pinMode(LED_PIN_R, OUTPUT);
-	RightTurnOff();
-	LeftTurnOff();
+void _LED::Initialization(void) {
+    //L_pin = _L_pin;
+    //R_pin = _R_pin;
+    pinMode(LED_PIN_L, OUTPUT);
+    pinMode(LED_PIN_R, OUTPUT);
+    RightTurnOff();
+    LeftTurnOff();
 }
 
 /************************************************************************************************************
@@ -36,9 +33,8 @@ void _LED::Initialization(void)
 【返 回 值】：	无
 【简    例】：	RightTurnOn();	打开右灯
 ************************************************************************************************************/
-void _LED::RightTurnOn(void)
-{
-	digitalWrite(LED_PIN_R, LED_ON);
+void _LED::RightTurnOn(void) {
+    digitalWrite(LED_PIN_R, LED_ON);
 }
 
 /************************************************************************************************************
@@ -47,9 +43,8 @@ void _LED::RightTurnOn(void)
 【返 回 值】：	无
 【简    例】：	RightTurnOFF();		关闭任务板右灯
 ************************************************************************************************************/
-void _LED::RightTurnOff(void)
-{
-	digitalWrite(LED_PIN_R, LED_OFF);
+void _LED::RightTurnOff(void) {
+    digitalWrite(LED_PIN_R, LED_OFF);
 }
 
 /************************************************************************************************************
@@ -58,9 +53,8 @@ void _LED::RightTurnOff(void)
 【返 回 值】：	无
 【简    例】：	LeftTurnOn();	打开任务板左灯
 ************************************************************************************************************/
-void _LED::LeftTurnOn(void)
-{
-	digitalWrite(LED_PIN_L, LED_ON);
+void _LED::LeftTurnOn(void) {
+    digitalWrite(LED_PIN_L, LED_ON);
 }
 
 /************************************************************************************************************
@@ -69,8 +63,7 @@ void _LED::LeftTurnOn(void)
 【返 回 值】：	无
 【简    例】：	LeftTurnOff();		关闭任务板左灯
 ************************************************************************************************************/
-void _LED::LeftTurnOff(void)
-{
-	digitalWrite(LED_PIN_L, LED_OFF);
+void _LED::LeftTurnOff(void) {
+    digitalWrite(LED_PIN_L, LED_OFF);
 }
 
