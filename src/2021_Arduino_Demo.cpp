@@ -193,10 +193,19 @@ void l_loop() {
         Tcount += (millis() - frisrtime);
     }
 
-    a++;
-    a = a > 30 ? -80 : a;
-    k230.setCameraSteeringGearAngle(a);
+    //a += 10;
+    //a = a > 30 ? -80 : a;
+    //k230.setCameraSteeringGearAngle(a);
+    //delay(1000);
 
+    if (k230.ping()) {
+        carLight.RightTurnOn();
+        carLight.LeftTurnOn();
+    }
+    delay(1000);
+    carLight.RightTurnOff();
+    carLight.LeftTurnOff();
+    delay(1000);
 }
 
 

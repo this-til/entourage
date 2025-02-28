@@ -3,10 +3,10 @@
 '''
 import binascii
 import gc
-import time
 
 import lcd
 import sensor
+import time
 from Maix import GPIO
 from fpioa_manager import fm
 from machine import PWM, UART, Timer
@@ -252,11 +252,6 @@ def find_blobs_in_rois(img):
     '''
     global ROIS
     global is_debug
-    # gc.collect()
-    # canvas = img.copy()
-    # canvas.binary([low_thresholdaaa],invert = 1)
-
-    # img.binary([low_threshold],invert = 1)
 
     roi_blobs_result = {}  # 在各个ROI中寻找色块的结果记录
     for roi_direct in ROIS.keys():
@@ -524,7 +519,7 @@ def QR_ccc_Check():
                 img_roi = img1.copy(roi=roi)
                 # 处理颜色判断
                 result = QR_RWM(img_roi)
-                send_qr_code_count1(result)
+                send_qr_code_count(result)
 
                 sensor.skip_frames(time=1200)
 

@@ -64,16 +64,41 @@ enum TrafficLightModel {
     YELLOW = 0x03,
 };
 
+enum K210Color {
+    K_NONE = 0x00,
+    K_WHITE = 0x01,
+    K_BLACK = 0x02,
+    K_RED = 0x03,
+    K_GREEN = 0x04,
+    K_YELLOW = 0x05,
+};
+
 class DeviceBase {
 public:
     explicit DeviceBase(uint8_t id);
 
-    bool awaitReturn(uint8_t buf[], uint8_t serviceId, unsigned long outTime_ms = 500);
+    void write(uint8_t* buf);
 
-    bool verificationReturn(uint8_t buf[], uint8_t serviceId);
+    bool verificationReturn(const uint8_t* buf, const uint8_t* serviceId, uint8_t serviceLen);
+
+    bool awaitReturn(uint8_t buf[], const uint8_t* serviceId, uint8_t serviceLen);
+
+    bool verificationReturn(const uint8_t* buf, uint8_t serviceId);
+
+    bool awaitReturn(uint8_t buf[], uint8_t serviceId);
 
 protected:
     uint8_t id;
+
+    uint16_t writeBus;
+    uint8_t writeLen;
+    bool writeVerify;
+
+    uint16_t readBus;
+    uint8_t readLen;
+    bool readVerify;
+    bool readTailIntegrity;
+    unsigned long readOutTime_ms;
 };
 
 /***
@@ -114,10 +139,9 @@ public:
 
     /***
      * 获取门闸
-     * @param awaitTimeMs 等待时间，由于 "智能道闸标志物处于关闭状态时请求回传状态，不会回传任何指令。" 设定等待时间 ??? 离谱的需求
-     * @return id true 开启
+     * "智能道闸标志物处于关闭状态时请求回传状态，不会回传任何指令。"
      */
-    bool getGateControl(int awaitTimeMs = 100);
+    bool getGateControl();
 };
 
 /***
@@ -300,6 +324,21 @@ class AdvertisingBoard : DeviceBase {
 
 };
 
+struct QrMessage {
+    bool efficient;
+
+    K210Color qrColor = K_WHITE;
+
+    /***
+     * 二维码信息容器
+     */
+    uint8_t* message;
+
+    uint8_t messageMaxLen = 0;
+
+    uint8_t messageLen = 0;
+};
+
 class K230 : DeviceBase {
 public:
     explicit K230(uint8_t id);
@@ -309,6 +348,32 @@ public:
     * @param angle 角度 舵机角度，范围-80至+40，0度垂直于车身
     */
     void setCameraSteeringGearAngle(int8_t angle);
+
+    /***
+    * 设置寻迹是否开启
+    */
+    void setTrackModel(bool open);
+
+    /***
+     *
+     * @param count
+     * @param qrMessageArray
+     * @param len
+     */
+    void qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen);
+
+    /***
+     * 检测红绿灯
+     * @param color
+     */
+    K210Color trafficLightRecognize();
+
+    /***
+     * 测试连接用的
+     * @return
+     */
+    bool ping();
+
 };
 
 /***
