@@ -98,12 +98,15 @@ uint8_t Data_Length;
 uint8_t Data_OTABuf[40];
 
 /*void setup() {
-
+    l_setup();
 }
 
 void loop() {
-
+    l_loop();
 }*/
+
+defineTask(TaskMain);
+defineTask(TaskCar);
 
 void l_setup() {
     Serial.begin(115200);
@@ -139,39 +142,36 @@ void l_setup() {
     // 初始化frisrtime变量为0
     Tcount = 0;
     // 初始化Tcount变量为0
+
+    mySCoop.start();
+
+    Serial.println("init end");
+
 }
 
-int8_t a;
 
 void l_loop() {
-    uint8_t si = 0;
-    frisrtime = millis();
+    yield();
+}
 
-    CoreKEY.Kwhile(KEY_Handler);  //按键检测
 
-    if (ExtSRAMInterface.ExMem_Read(0x6100) != 0x00)  //从车接收ZigBee数据
-    {
-        ExtSRAMInterface.ExMem_Read_Bytes(ZigBee_command, 8);
-        ZigBee_judge = ZigBee_command[6];  //获取校验和
-        Command.Judgment(ZigBee_command);  //计算校验和
-        // ZigBee_judge == ZigBee_command[6]) &&
-        if ((ZigBee_command[0] == 0x55) && (ZigBee_command[7] == 0xBB)) {
-            ZigBeeRx_Handler(ZigBee_command);  //ZigBee接收数据处理
-        }
+QrMessage qrMessageArray[4] = {
+};
+uint8_t message[4][24] = {};
+
+void TaskMain::setup() {
+    for (int i = 0; i < 4; ++i) {
+        qrMessageArray[i].message = message[i];
+        qrMessageArray[i].messageMaxLen = 24;
     }
+}
 
-    // if (ExtSRAMInterface.ExMem_Read(0x6038) != 0x00)  //检测OpenMV识别结果
-    // {
-    //   Data_Type = ExtSRAMInterface.ExMem_Read(0x603A);
-    //   Data_Flag = ExtSRAMInterface.ExMem_Read(0x603B);
-    //   Data_Length = ExtSRAMInterface.ExMem_Read(0x603C);
-    //   Data_Length = Data_Length + 6;
-    //   ExtSRAMInterface.ExMem_Read_Bytes(0x6038, Data_OTABuf, Data_Length);
-    //   if ((Data_OTABuf[0] == 0x55) && (Data_OTABuf[1] == 0x02)) {
-    //     ExtSRAMInterface.ExMem_Write_Bytes(0x6180, Data_OTABuf, Data_Length);  //使用自定义数据区上传OpenMV识别结果
-    //     OpenMVRx_Handler(Data_OTABuf);                                         //接收OpenMV，数据处理函数
-    //   }
-    // }
+
+void TaskMain::loop() {
+
+    CoreKEY.Kwhile(KEY_Handler);
+
+    k230.loop();
 
     if (((millis() - frisrtime >= TSendCycle) || (Tcount >= TSendCycle)) && (sendflag == 1))  //获取、上传任务版数据
     {
@@ -193,55 +193,55 @@ void l_loop() {
         Tcount += (millis() - frisrtime);
     }
 
-    //a += 10;
-    //a = a > 30 ? -80 : a;
-    //k230.setCameraSteeringGearAngle(a);
-    //delay(1000);
+}
 
-    if (k230.ping()) {
+void TaskCar::setup() {
+
+}
+
+void TaskCar::loop() {
+    /*if (k230.ping()) {
         carLight.RightTurnOn();
         carLight.LeftTurnOn();
     }
-    delay(1000);
+    sleep(1000);
     carLight.RightTurnOff();
     carLight.LeftTurnOff();
-    delay(1000);
+    sleep(1000);*/
 }
 
 
-void ZigBeeRx_Handler(uint8_t* mar) {}
+void KEY_Handler(uint8_t k_value) {
+#if DE_BUD
+    Serial.print("KEY_Handler:");
+    logHex(k_value);
+    Serial.println();
+#endif
 
-void OpenMVRx_Handler(uint8_t* mac) {}
+    K210Color k210Color;
+    uint8_t count;
 
-void Analyze_Handle(uint8_t com) {}
 
-void KEY_Handler(uint8_t k_value) {}
+    switch (k_value) {
+        case 0x01:
+            k230.setCameraSteeringGearAngle(0);
+            k230.qrRecognize(&count, qrMessageArray, 4);
+            break;
+        case 0x02:
+            k230.setCameraSteeringGearAngle(0);
+            k230.trafficLightRecognize(&k210Color);
+            break;
+        case 0x03:
+
+            break;
+        case 0x04:
+
+            break;
+    }
+}
 
 String DecIntToHexStr(long long num) {}
 
-void OpenMVTrack_Disc_StartUp(void) {}
-
-void OpenMVTrack_Disc_CloseUp(void) {}
-
-void Servoangle_control(uint8_t data) {}
-
-uint8_t qrdi1_buf[8] = {0x55, 0x02, 0x92, 0x00, 0x00, 0x00, 0x00, 0xBB};  // 给OpenMV发送识别二维码
-//********************************************************************************
-/*
-功    能：向K210发送数据函数（优先在mixpy里给摄像头导入程序）
-参    数： 01开启二维码识别
-           02关闭二维码识别
-           03开启交通灯识别
-           04关闭交通灯识别 
-           05切换至彩色摄像头
-           06切换至灰度摄像头         
-返 回 值：无
-*/
-void K210_Send(int8_t angle) {
-    qrdi1_buf[3] = angle;
-    Command.Judgment(qrdi1_buf);  //计算校验和
-    ExtSRAMInterface.ExMem_Write_Bytes(0x6008, qrdi1_buf, 8);
-}
 
 void Beep_time3() {
     CoreBeep.Initialization();
@@ -259,72 +259,10 @@ void Beep_time3() {
 }
 
 
-//磁悬浮无线充电标志物
-//开启
-uint8_t open_wuxiancongdian_buf[] = {0x55, 0x0A, 0x02, 0x00, 0x00, 0x00, 0x00, 0xBB};
-
-void wuxiancongdian(uint8_t a, uint8_t b, uint8_t c) {
-    open_wuxiancongdian_buf[3] = a;
-    open_wuxiancongdian_buf[4] = b;
-    open_wuxiancongdian_buf[5] = c;
-    Command.Judgment(open_wuxiancongdian_buf);  //计算校验和
-    ExtSRAMInterface.ExMem_Write_Bytes(0x6008, open_wuxiancongdian_buf, 8);
-}
-
-//修改
-uint8_t xg_wuxiancongdian_buf[] = {0x55, 0x0A, 0x03, 0x00, 0x00, 0x00, 0x00, 0xBB};
-
-void wuxiancongdianxg(uint8_t a, uint8_t b, uint8_t c) {
-    xg_wuxiancongdian_buf[3] = a;
-    xg_wuxiancongdian_buf[4] = b;
-    xg_wuxiancongdian_buf[5] = c;
-    Command.Judgment(xg_wuxiancongdian_buf);  //计算校验和
-    ExtSRAMInterface.ExMem_Write_Bytes(0x6008, xg_wuxiancongdian_buf, 8);
-}
-
-
-uint8_t mr_wuxiancongdian_buf[] = {0x55, 0x0A, 0x01, 0x01, 0x00, 0x00, 0x00, 0xBB};
-
-void wuxiancongdianmr(void) {
-    Command.Judgment(mr_wuxiancongdian_buf);  //计算校验和
-    ExtSRAMInterface.ExMem_Write_Bytes(0x6008, mr_wuxiancongdian_buf, 8);
-}
-
-
-/*
-道闸测试
-*/
-uint8_t open_road_buf[] = {0x55, 0x03, 0x01, 0x01, 0x00, 0x00, 0x00, 0xBB};
-
-void Road_Gate_Test(void) {
-    Command.Judgment(open_road_buf);  //计算校验和
-    ExtSRAMInterface.ExMem_Write_Bytes(0x6008, open_road_buf, 8);
-}
-
-uint8_t test_buf[] = {0xFD, 0x00, 0x06, 0x01, 0x01, 0xC4, 0xFA, 0xBA, 0xC3};
-
-/*
-  语音播报任意内容
-*/
-void Speech_Sounds_Ctr(void) {
-    ExtSRAMInterface.ExMem_Write_Bytes(0x6180, test_buf, 13);
-}
-
-
-uint8_t repo_buf[] = {0x03, 0x05, 0x14, 0x45, 0xDE, 0x92};
-
-/*
-红外测试
-*/
-void Infrared_Test(void) {
-    Infrare.Transmition(repo_buf, 6);
-}
-
-uint8_t trm_buf[] = {0xAF, 0x06, 0x00, 0x02, 0x00, 0x00, 0x01, 0xBB};
-
 /*
 语音识别
 */
+/*
 void Speech_Disc(void) {
     uint8_t sph_id = 0;
     sph_id = BKRC_Voice.BKRC_Voice_Extern(0);  //0为控制语音播报标志物随机播报并开启识别，
@@ -335,30 +273,7 @@ void Speech_Disc(void) {
     trm_buf[2] = sph_id;
     ExtSRAMInterface.ExMem_Write_Bytes(0x6008, trm_buf, 8);  //上传识别结果至评分终端
 }
-
-
-uint8_t carpai_buf[] = {0x55, 0x01, 0x44, wuxiancd2023[0], wuxiancd2023[1], wuxiancd2023[2], 0x00, 0xBB};
-
-void carpai_Test(void) {
-    Command.Judgment(carpai_buf);  //计算校验和
-    ExtSRAMInterface.ExMem_Write_Bytes(0x6008, carpai_buf, 8);
-}
-
-uint8_t carpai1_buf[] = {0x55, 0x01, 0x45, wuxiancd2023[3], wuxiancd2023[4], wuxiancd2023[5], 0x00, 0xBB};
-
-void carpai1_Test(void) {
-    Command.Judgment(carpai1_buf);  //计算校验和
-    ExtSRAMInterface.ExMem_Write_Bytes(0x6008, carpai1_buf, 8);
-}
-
-void zdytoA(int data) {
-    uint8_t road_bufa[] = {0x55, 0x01, 0x46, 0x00, 0x00, 0x00, 0x00, 0xBB};
-    road_bufa[3] = (uint8_t) (data >> 8);  // 将data的高八位存储到road_bufa[3]
-    road_bufa[4] = (uint8_t) data;         // 将data的低八位存储到road_bufa[4]
-    Command.Judgment(road_bufa);          // 计算校验和
-    delay(500);
-    ExtSRAMInterface.ExMem_Write_Bytes(0x6008, road_bufa, 8);
-}
+*/
 
 
 //车牌发送到主车
@@ -389,20 +304,6 @@ void carpaitoA(const char* data) {
 }
 
 
-void shuju_Test(void) {
-    while (1) {
-        if (ExtSRAMInterface.ExMem_Read(0x6100) != 0x00)  //从车接收ZigBee数据
-        {
-            ExtSRAMInterface.ExMem_Read_Bytes(ZigBee_command, 8);
-            ZigBee_judge = ZigBee_command[6];  //获取校验和
-            Command.Judgment(ZigBee_command);  //计算校验和
-            if ((ZigBee_command[0] == 0x55) && (ZigBee_command[7] == 0xBB) && (ZigBee_command[1] == 0x02) &&
-                (ZigBee_command[2] == 0x34)) {
-                break;
-            }
-        }
-    }
-}
 
 
 
@@ -847,71 +748,7 @@ void KEY_Handler(uint8_t k_value) {
 
 
 /*
-*//*
-功    能：从车ZigBee接收，处理函数
-参    数：*mar 接收数据指针
-返 回 值：无
-*//*
-void ZigBeeRx_Handler(uint8_t* mar) {
-    switch (mar[1]) {
-        case 0x02:  //主车
-            Serial.println(mar[2], HEX);
-            Analyze_Handler(mar);  //主车命令相应函数
-            break;
-        case 0x03:  //道闸标志物
-            break;
-        case 0x04:  //LED显示标志物（暂无返回）
-            break;
-        case 0x05:  //立体车库标志物B
-            break;
-        case 0x06:  //语音播报标志物
-            break;
-        case 0x07:  //红外报警标志物
-            break;
-        case 0x08:  //TFT显示标志物B
-            break;
-        case 0x09:  //调光标志物
-            break;
-        case 0x0A:  //磁悬浮无线充电标志物
-            break;
-        case 0x0B:  //TFT显示标志物A
-            break;
-        case 0x0C:  //ETC系统标志物
-            break;
-        case 0x0D:  //立体车库标志物A
-            break;
-        case 0x0E:  //交通灯标注物A
-            break;
-        case 0x0F:  //交通灯标志物B
-            break;
-        default:
-            break;
-    }
-}
-
-*//*
-功    能：从车接收 机器视觉Camera返回数据
-参    数：*mac 接收数据指针
-返 回 值：无
-*//*
-void OpenMVRx_Handler(uint8_t* mac) {
-    switch (mac[2]) {
-        case 0x91:  //保留
-
-            break;
-        case 0x92:  //二维码识别
-
-            break;
-        default:
-            break;
-    }
-}
-
-*//**
-功    能：从车任务处理函数
-参    数：com 主指令
-返 回 值：无
-*//*
+//从车任务处理函数
 void Analyze_Handler(uint8_t* com) {
     Serial.println(com[2], HEX);
     switch (com[2]) {

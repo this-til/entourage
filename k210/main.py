@@ -10,24 +10,11 @@ from machine import PWM, UART, Timer
 
 isDebug = True
 
-# ---------------------配置-----------------------
-
+# region 配置
 DATA_FRAME_HEADER = 0x55
 DATA_FRAME_TAIL = 0xBB
 
 NATIVE_IDENTIFIER = 0x02
-
-CAMERA_ANGLE_ID = 0x03
-
-TRACKING_ID = 0x02
-
-QR_SERVICE_ID = 0x03
-QR_COUNT_SERVICE_ID = 0x01
-QR_MESSAGE_SERVICE_ID = 0x02
-
-TRAFFIC_LIGHT_SERVICE_ID = 0x04
-
-PING_SERVICE_ID = 0xFE
 
 NONE = 0x00
 WHITE = 0x01
@@ -36,10 +23,25 @@ RED = 0x03
 GREEN = 0x04
 YELLOW = 0x05
 
+COLOR_TO_STRING_MAP = {
+    NONE: "NONE",
+    WHITE: "WHITE",
+    BLACK: "BLACK",
+    RED: "RED",
+    GREEN: "GREEN",
+    YELLOW: "YELLOW"
+}
 
-# ---------------------配置_END-----------------------
 
-# ---------------------INIT-----------------------
+def colorToeString(color):
+    return COLOR_TO_STRING_MAP[color]
+    pass
+
+
+# endregion
+
+
+# region INIT
 def init():
     initGpio()
     initUart()
@@ -51,11 +53,10 @@ def init():
     pass
 
 
-# ---------------------INIT_END-----------------------
+# endregion
 
 
-# ---------------------GPIO-----------------------
-
+# region GPIO
 LED_B = None
 
 
@@ -66,15 +67,14 @@ def initGpio():
     pass
 
 
-# ---------------------GPIO_END-----------------------
+# endregion
 
 
-# ---------------------TIME-----------------------
-
+# region TIME
 uartTime = None
+#sendTime = None
 pwmTime = None
 trackTime = None
-
 
 def initTime():
     global uartTime
@@ -84,12 +84,14 @@ def initTime():
     uartTime.start()
     pwmTime = Timer(Timer.TIMER0, Timer.CHANNEL0, mode=Timer.MODE_PWM)
     trackTime = Timer(Timer.TIMER2, Timer.CHANNEL2, mode=Timer.MODE_PERIODIC, period=50, callback=trackLoop)
+    #sendTime = Timer(Timer.TIMER3, Timer.CHANNEL3, mode=Timer.MODE_PERIODIC, period=200, callback=planSend)
     pass
 
 
-# ---------------------TIME_END-----------------------
+# endregion
 
-# ---------------------PWM-----------------------
+
+# region PWM
 steeringEngine = None
 
 
@@ -99,13 +101,14 @@ def initPwm():
     pass
 
 
-# ---------------------PWM_END-----------------------
+# endregion
 
-# ---------------------UART-----------------------
 
+# region UART
 uart = None
 
 _uart_buffer = b''
+
 
 
 def initUart():
@@ -140,7 +143,7 @@ def uartReadBack(e):
 
         # 验证帧尾和长度
         if _uart_buffer[head_idx + 7] == DATA_FRAME_TAIL:
-            frame_data = _uart_buffer[head_idx: head_idx + 7]
+            frame_data = _uart_buffer[head_idx: head_idx + 8]
             if isDebug:
                 log("a full frame is received：" + str(frame_data))
             handleInstruction(frame_data)
@@ -158,10 +161,10 @@ def uartReadBack(e):
 def handleInstruction(buf):
     if buf[1] != NATIVE_IDENTIFIER:
         return
-    #if buf[len(buf) - 2] != judgment(buf):
-    #    if isDebug:
-    #        log("judgment fail, s:" + str(buf[len(buf) - 2]) + " t:" + str(judgment(buf)))
-    #    return
+    if buf[len(buf) - 2] != judgment(buf):
+        if isDebug:
+            log("judgment fail, s:" + str(buf[len(buf) - 2]) + " t:" + str(judgment(buf)))
+        return
     if buf[2] == 0x91:
         if buf[3] == 0x01:
             setTrack(True)
@@ -191,6 +194,8 @@ def send(buf):
     pass
 
 
+
+
 def judgment(buf):
     f = 0
     for i in range(2, len(buf) - 2):
@@ -199,9 +204,10 @@ def judgment(buf):
     return f % 256
 
 
-# ---------------------UART_END-----------------------
+# endregion
 
-# ---------------------CAMERA-----------------------
+
+# region CAMERA
 def initCameraHighRes():
     '''
     初始化感光芯片为高清分辨率
@@ -217,11 +223,10 @@ def initCameraHighRes():
     print("Camera initialized")
 
 
-# ---------------------CAMERA_END-----------------------
+# endregion
 
 
-# ---------------------舵机控制-----------------------
-
+# region 舵机控制
 def setCameraSteeringGearAngle(angle):
     '''
     设置摄像头舵机角度
@@ -233,10 +238,10 @@ def setCameraSteeringGearAngle(angle):
     pass
 
 
-# ---------------------舵机控制_END-----------------------
+# endregion
 
-# ---------------------寻迹-----------------------
 
+# region 寻迹
 trackFlag = False
 
 # ROI区域权重值
@@ -304,10 +309,10 @@ def setTrack(open):
     pass
 
 
-# ---------------------寻迹_END-----------------------
+# endregion
 
-# ---------------------取色-----------------------
 
+# region 取色
 class ColorBlock:
     roi = (0, 0, 0, 0)
 
@@ -371,14 +376,21 @@ def colorExtractionLoop(img, outImg=None):
     pass
 
 
-# ---------------------去色_END-----------------------
+# endregion
 
 
-# ---------------------二维码-----------------------
-
+# region 二维码
 def qrRecognize(img, outImg=None):
+    if isDebug:
+        log("qrRecognize...")
+        pass
+
     qrcodes = img.find_qrcodes()
     qrcodesLen = len(qrcodes)
+
+    if isDebug:
+        log("count:" + str(qrcodesLen))
+        pass
 
     buf = [
         DATA_FRAME_HEADER,
@@ -418,6 +430,10 @@ def qrRecognize(img, outImg=None):
             )
             pass
 
+        if isDebug:
+            log("message:" + qr.payload())
+            pass
+
         buf = ([
                    DATA_FRAME_HEADER,
                    NATIVE_IDENTIFIER,
@@ -428,11 +444,12 @@ def qrRecognize(img, outImg=None):
                    colorId,
                    len(qr.payload().encode())
                ]
-               + qr.payload().encode()
+               + list(qr.payload().encode())
                + [
                    0x00,
                    DATA_FRAME_TAIL
                ])
+
 
         send(buf)
         pass
@@ -464,12 +481,10 @@ def identifyQrCodeColor(img):
     pass
 
 
-# ---------------------二维码_END-----------------------
+# endregion
 
 
-# ---------------------红绿灯-----------------------
-
-
+# region 红绿灯
 TL_RED_RADIUS = [
     (37, 66, 45, 90, -17, 49)
 ]
@@ -482,6 +497,10 @@ TL_YELLOW_RADIUS = [
 
 
 def trafficLightRecognize(img, outImg=None):
+    if isDebug:
+        log("trafficLightRecognize...")
+        pass
+
     R = len(img.find_blobs(TL_RED_RADIUS, x_stride=20, y_stride=20, area_threshold=20, pixels_threshold=5))
     G = len(img.find_blobs(TL_GREEN_RADIUS, x_stride=20, y_stride=20, area_threshold=20, pixels_threshold=5))
     Y = len(img.find_blobs(TL_YELLOW_RADIUS, x_stride=20, y_stride=20, area_threshold=20, pixels_threshold=5))
@@ -494,6 +513,10 @@ def trafficLightRecognize(img, outImg=None):
         color = GREEN
     else:
         color = YELLOW
+
+    if isDebug:
+        log("recognize:" + colorToeString(color))
+        pass
 
     buf = bytearray([
         DATA_FRAME_HEADER,
@@ -511,8 +534,10 @@ def trafficLightRecognize(img, outImg=None):
     pass
 
 
-# ---------------------PING-----------------------
+# endregion
 
+
+# region PING
 def pinged():
     buf = [
         DATA_FRAME_HEADER,
@@ -527,14 +552,11 @@ def pinged():
     send(buf)
 
 
-# ---------------------PING_END-----------------------
-
-# ---------------------红绿灯_END-----------------------
+# endregion
 
 
-# ---------------------LOG-----------------------
-
-LOG_MAX_LINES = 20  # 最大显示行数
+# region LOG
+LOG_MAX_LINES = 13  # 最大显示行数
 FONT_SIZE = 16  # 推荐12/16/24
 LINE_HEIGHT = FONT_SIZE + 2  # 行高
 
@@ -558,9 +580,11 @@ def drawLogs(img):
             log_line
         )
         y += LINE_HEIGHT
+        pass
 
 
-# ---------------------LOG_END-----------------------
+# endregion
+
 
 primitiveImg = None
 
@@ -570,13 +594,16 @@ if __name__ == '__main__':
     setCameraSteeringGearAngle(-55)
 
     while True:
-        gc.collect()
+        try:
+            gc.collect()
 
-        img = sensor.snapshot().lens_corr(strength=1.5, zoom=1.0)
+            img = sensor.snapshot().lens_corr(strength=1.5, zoom=1.0)
 
-        primitiveImg = img.copy()
+            primitiveImg = img.copy()
 
-        colorExtractionLoop(primitiveImg, img)
-        drawLogs(img)
+            colorExtractionLoop(primitiveImg, img)
+            drawLogs(img)
 
-        lcd.display(img)
+            lcd.display(img)
+        except Exception as err:
+            log("unknown err:" + str(err))

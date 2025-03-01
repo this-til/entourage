@@ -77,28 +77,31 @@ class DeviceBase {
 public:
     explicit DeviceBase(uint8_t id);
 
-    void write(uint8_t* buf);
+    void send(uint8_t* buf);
 
-    bool verificationReturn(const uint8_t* buf, const uint8_t* serviceId, uint8_t serviceLen);
+    bool check(const uint8_t* buf, const uint8_t* serviceId, uint8_t serviceLen);
 
     bool awaitReturn(uint8_t buf[], const uint8_t* serviceId, uint8_t serviceLen);
 
-    bool verificationReturn(const uint8_t* buf, uint8_t serviceId);
+    bool check(const uint8_t* buf, uint8_t serviceId);
 
     bool awaitReturn(uint8_t buf[], uint8_t serviceId);
 
 protected:
     uint8_t id;
 
-    uint16_t writeBus;
-    uint8_t writeLen;
-    bool writeVerify;
+    uint16_t sendBus;
+    uint8_t sendLen;
+    bool sendVerify;
+    int32_t sendCooling_ms;
 
     uint16_t readBus;
     uint8_t readLen;
     bool readVerify;
     bool readTailIntegrity;
     unsigned long readOutTime_ms;
+
+    bool debug;
 };
 
 /***
@@ -341,6 +344,8 @@ struct QrMessage {
 
 class K230 : DeviceBase {
 public:
+
+
     explicit K230(uint8_t id);
 
     /***
@@ -355,24 +360,47 @@ public:
     void setTrackModel(bool open);
 
     /***
+     * 获取寻迹标志位
+     * 高八位为靠近中心点
+     * 该函数需要开启寻迹
+     * @return
+     */
+    uint16_t getTrackFlagBit();
+
+    /***
      *
      * @param count
      * @param qrMessageArray
      * @param len
      */
-    void qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen);
+    bool qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen);
 
     /***
      * 检测红绿灯
      * @param color
      */
-    K210Color trafficLightRecognize();
+    bool K230::trafficLightRecognize(K210Color* k210Color);
 
     /***
      * 测试连接用的
      * @return
      */
     bool ping();
+
+    void loop();
+
+private:
+    bool receiveTrack;
+    uint16_t trackFlagBit;
+
+};
+
+/***
+ * 你的小车车
+ * 一些和车有关的，杂七杂八的就扔在这里
+ */
+class Car {
+
 
 };
 
@@ -419,5 +447,10 @@ extern StreetLamp streetLampA;
  * 摄像头
  */
 extern K230 k230;
+/***
+ * 你的小车车
+ */
+extern Car car;
+
 
 #endif //ENTOURAGE_CLION_DEVICE_H

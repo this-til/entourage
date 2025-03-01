@@ -6,7 +6,7 @@ double ultrasonic_ranging(int sys, int rangeFrequency, int wait) {
     double distance = 0;
     for (int i = 0; i < rangeFrequency; ++i) {
         distance += Ultrasonic.Ranging(CM);
-        delay(wait);
+        sleep(wait);
     }
     return distance / rangeFrequency;
 }
@@ -16,7 +16,7 @@ void ultrasonic_adjustDistance(uint8_t carSeep, uint8_t targetDistance, double e
     ulong startTime = millis();
     while (millis() - startTime >= controlTime_ms) {
         DCMotor.Stop();
-        double distance = ultrasonic_ranging(CM);
+        double distance = Ultrasonic.Ranging(CM);;
         double distanceError = distance - targetDistance;
         if (abs(distanceError) > errorMargin) {
             if (distanceError > errorMargin) {
@@ -25,13 +25,13 @@ void ultrasonic_adjustDistance(uint8_t carSeep, uint8_t targetDistance, double e
                 DCMotor.Back(carSeep);
             }
         }
-        delay(wait);
+        sleep(wait);
     }
     DCMotor.Stop();
 }
 
 
-uint8_t LED_display_buf[] = {0x55, 0x04, 0x04, 0x00, 0x00, 0x00, 0x00, 0xbb};
+//uint8_t LED_display_buf[] = {0x55, 0x04, 0x04, 0x00, 0x00, 0x00, 0x00, 0xbb};
 
 /*
 超声波测距

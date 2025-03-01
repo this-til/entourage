@@ -2,6 +2,9 @@
 // Created by til on 2025/2/26.
 //
 
+
+#define DE_BUD true
+
 #ifndef ENTOURAGE_CLION_DEF_H
 #define ENTOURAGE_CLION_DEF_H
 
@@ -18,13 +21,14 @@
 #include <BKRC_Voice.h>
 #include <Arduino.h>
 #include "Ultrasonic.h"
+#include "SCoop.h"
 
 #include "UltrasonicUtil.h"
 #include "2021_Arduino_Demo.h"
 #include "CarControl.h"
 #include "QrUtil.h"
-#include "TrafficLightsUtil.h"
 #include "Device.h"
+#include "Util.h"
 
 // 标准无符号类型
 #define uchar  unsigned char
