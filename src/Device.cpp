@@ -29,8 +29,8 @@ void DeviceBase::send(uint8_t* buf) {
         }
         buf[sendLen - 2] = static_cast<int8_t>(com % 256);
     }
-#if DE_BUD
-    Serial.print("send:");
+#if DE_BUG
+    Serial.print("[DEBUG] send:");
     logHex(buf, sendLen);
     Serial.println();
 #endif
@@ -43,34 +43,37 @@ void DeviceBase::send(uint8_t* buf) {
 
 bool DeviceBase::check(const uint8_t* buf, const uint8_t* serviceId, uint8_t serviceLen) {
     if (buf[0] != DATA_FRAME_HEADER) {
-#if DE_BUD
+#if DE_BUG
         Serial.print("  inaccuracy header:");
         logHex(buf[0]);
 #endif
         return false;
     }
     if (readTailIntegrity && buf[readLen - 1] != DATA_FRAME_TAIL) {
-#if DE_BUD
+#if DE_BUG
         Serial.print("  inaccuracy tail:");
         logHex(buf[readLen - 1]);
+        Serial.println("    check failure...");
 #endif
         return false;
     }
     if (buf[1] != id) {
-#if DE_BUD
-        Serial.print("  inaccuracy device:");
+#if DE_BUG
+        Serial.println("  inaccuracy device:");
         logHex(buf[1]);
+        Serial.println("    check failure...");
 #endif
         return false;
     }
     for (int i = 0; i < serviceLen; ++i) {
         if (buf[2 + i] != serviceId[i]) {
-#if DE_BUD
+#if DE_BUG
             Serial.print("  inaccuracy service");
             Serial.print("predict:");
             logHex(serviceId, (uint16_t) serviceLen);
             Serial.print(",source:");
             logHex(buf + 2, (uint16_t) serviceLen);
+            Serial.println("    check failure...");
 #endif
             return false;
         }
@@ -83,17 +86,20 @@ bool DeviceBase::check(const uint8_t* buf, const uint8_t* serviceId, uint8_t ser
         }
         auto checksum = uint8_t(com % 256);
         if (buf[readLen - 2] != checksum) {
-#if DE_BUD
+#if DE_BUG
             Serial.print("  inaccuracy checksum:");
             Serial.print("predict:");
             logHex(checksum);
             Serial.print(",source:");
             logHex(buf[readLen - 2]);
+            Serial.println("    check failure...");
 #endif
             return false;
         }
     }
-
+#if DE_BUG
+    Serial.println("    check successful...");
+#endif
     return true;
 }
 
@@ -101,30 +107,24 @@ bool DeviceBase::check(const uint8_t* buf, const uint8_t* serviceId, uint8_t ser
 bool DeviceBase::awaitReturn(uint8_t* buf, const uint8_t* serviceId, uint8_t serviceLen) {
     unsigned long startTime = millis();
 
-#if DE_BUD
-    Serial.println("awaitReturn...");
+#if DE_BUG
+    Serial.println("[DEBUG] awaitReturn...");
 #endif
     while (millis() - startTime < readOutTime_ms) {
         if (ExtSRAMInterface.ExMem_Read(readBus) == 0x00) {
             continue;
         }
         ExtSRAMInterface.ExMem_Read_Bytes(readBus, buf, readLen);
-#if DE_BUD
-        Serial.print("read:");
+#if DE_BUG
+        Serial.print("[DEBUG] read:");
         logHex(buf, readLen);
 #endif
         if (check(buf, serviceId, serviceLen)) {
-#if DE_BUD
-            Serial.println("    check successful...");
-#endif
             return true;
         }
-#if DE_BUD
-        Serial.println("   check failure...");
-#endif
     }
-#if DE_BUD
-    Serial.println("outTime...");
+#if DE_BUG
+    Serial.println("[WARN] outTime...");
 #endif
     return false;
 }
@@ -141,8 +141,8 @@ bool DeviceBase::awaitReturn(uint8_t* buf, uint8_t serviceId) {
 AlarmDesk::AlarmDesk(uint8_t id) : DeviceBase(id) {
 }
 
-void AlarmDesk::openByInfrared() {
-    //TODO 红外通信
+void AlarmDesk::openByInfrared(uint8_t* openCode) {
+    Infrare.Transmition(openCode, 6);
 }
 
 /***
@@ -212,28 +212,28 @@ void BusStop::setRtcStartTime(uint8_t HH, uint8_t mm, uint8_t ss) {
     send(buf);
 }
 
-void BusStop::getRtcDate(uint8_t* yy, uint8_t* MM, uint8_t* dd) {
+bool BusStop::getRtcDate(uint8_t* yy, uint8_t* MM, uint8_t* dd) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x31, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
-
-    if (awaitReturn(buf, 0x02)) {
+    bool successful = awaitReturn(buf, 0x02);
+    if (successful) {
         *yy = buf[3];
         *MM = buf[4];
         *dd = buf[5];
     }
-
+    return successful;
 }
 
-void BusStop::getRtcTime(uint8_t* HH, uint8_t* mm, uint8_t* ss) {
+bool BusStop::getRtcTime(uint8_t* HH, uint8_t* mm, uint8_t* ss) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x41, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
-
-    if (awaitReturn(buf, 0x03)) {
+    bool successful = awaitReturn(buf, 0x03);
+    if (successful) {
         *HH = buf[3];
         *mm = buf[4];
         *ss = buf[5];
     }
-
+    return successful;
 }
 
 void BusStop::setWeatherTemperature(Weather weather, uint8_t temperature) {
@@ -241,15 +241,15 @@ void BusStop::setWeatherTemperature(Weather weather, uint8_t temperature) {
     send(buf);
 }
 
-void BusStop::getWeatherTemperature(Weather* weather, uint8_t* temperature) {
+bool BusStop::getWeatherTemperature(Weather* weather, uint8_t* temperature) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x43, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
-
-    if (awaitReturn(buf, 0x04)) {
+    bool successful = awaitReturn(buf, 0x04);
+    if (successful) {
         *weather = Weather(buf[3]);
         *temperature = buf[4];
     }
-
+    return successful;
 }
 
 void BusStop::startSynthesizingLanguage(const uint8_t* data, uint16_t len, TextEncodingFormat textEncodingFormat) {
@@ -360,8 +360,13 @@ K230::K230(uint8_t id) : DeviceBase(id) {
     trackFlagBit = 0;
 }
 
+void K230::setTrackModel(bool open) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x91, 0x01, static_cast<uint8_t>(open ? 0x01 : 0x02), 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+    send(buf);
+}
+
 void K230::setCameraSteeringGearAngle(int8_t angle) {
-    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x91, 0x03, (uint8_t) angle, 0x00, 0x00, DATA_FRAME_TAIL};
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x91, 0x02, (uint8_t) angle, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
     //Command.Judgment(buf);
     //ExtSRAMInterface.ExMem_Write_Bytes(BUS_BASE_ADD, buf, 8);
@@ -369,17 +374,12 @@ void K230::setCameraSteeringGearAngle(int8_t angle) {
 }
 
 
-void K230::setTrackModel(bool open) {
-    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x91, static_cast<uint8_t>(open ? 0x01 : 0x02), 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
-}
-
-uint16_t K230::getTrackFlagBit() {
+uint8_t K230::getTrackFlagBit() {
     return trackFlagBit;
 }
 
 bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen) {
-#if DE_BUD
+#if DE_BUG
     Serial.println("qrRecognize...");
 #endif
 
@@ -407,11 +407,17 @@ bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen
                 : s_count;
     *count = s_count;
 
-#if DE_BUD
+
+#if DE_BUG
     Serial.print("recognize count:");
     logHex(s_count);
     Serial.println();
 #endif
+
+    if (s_count == 0) {
+        receiveTrack = true;
+        return true;
+    }
 
     uint8_t hitCount = 0;
     uint8_t bufLong[32] = {};
@@ -421,7 +427,7 @@ bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen
             continue;
         }
         ExtSRAMInterface.ExMem_Read_Bytes(readBus, bufLong, 32);
-#if DE_BUD
+#if DE_BUG
         Serial.print("read:");
         logHex(bufLong, 32);
         Serial.println();
@@ -434,7 +440,7 @@ bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen
                 || bufLong[3] != 0x01
                 || bufLong[4] != 0x02
                 ) {
-#if DE_BUD
+#if DE_BUG
             Serial.println("verification failure");
 #endif
             continue;
@@ -442,14 +448,14 @@ bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen
 
         uint8_t qrId = bufLong[5];
 
-#if DE_BUD
+#if DE_BUG
         Serial.print("receive qr id:");
         logHex(qrId);
         Serial.println();
 #endif
 
         if (qrId >= maxLen) {
-#if DE_BUD
+#if DE_BUG
             Serial.println("The id is greater than the quantity, which should not be...");
 #endif
             continue;
@@ -460,6 +466,12 @@ bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen
         qrMessage->efficient = true;
         qrMessage->qrColor = K210Color(bufLong[6]);
 
+#if DE_BUG
+        Serial.print("receive qr color:");
+        logHex(K210Color(bufLong[6]));
+        Serial.println();
+#endif
+
         uint8_t messageLen = bufLong[7];
         messageLen = messageLen > qrMessage->messageMaxLen
                      ? qrMessage->messageMaxLen
@@ -469,7 +481,7 @@ bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen
 
         qrMessage->messageLen = messageLen;
 
-#if DE_BUD
+#if DE_BUG
         Serial.print("message len:");
         logHex(messageLen);
         Serial.println();
@@ -479,7 +491,7 @@ bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen
             qrMessage->message[i] = bufLong[8 + i];
         }
 
-#if DE_BUD
+#if DE_BUG
         Serial.print("message:");
         Serial.write(bufLong + 8, messageLen);
         Serial.println();
@@ -493,18 +505,14 @@ bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen
 
     receiveTrack = true;
     return hitCount >= s_count;
-
-    return 0;
-
 }
 
 bool K230::trafficLightRecognize(K210Color* k210Color) {
-
-#if DE_BUD
-    Serial.println("trafficLightRecognize...");
-#endif
-
     receiveTrack = false;
+
+#if DE_BUG
+    Serial.println("[DEBUG] trafficLightRecognize...");
+#endif
 
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x92, 0x03, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
@@ -513,18 +521,97 @@ bool K230::trafficLightRecognize(K210Color* k210Color) {
     bool successful = awaitReturn(buf, serviceIds, 2);
 
     if (successful) {
-        *k210Color = K210Color(buf[3]);
+        *k210Color = K210Color(buf[4]);
+#if DE_BUG
+        Serial.print("[DEBUG] traffic light color:");
+        logObj(K210Color(buf[4]));
+        Serial.println();
+#endif
     }
 
     receiveTrack = true;
     return successful;
 }
 
+bool K230::trafficLightRecognize_rigorous(K210Color* k210Color, uint16_t consecutiveEqualDegree, uint16_t maxRetry) {
+    receiveTrack = false;
+
+    K210Color currentColor = K_NONE;
+    K210Color lastStableColor = K_NONE;
+    uint16_t consecutiveCount = 0;
+
+#if DE_BUG
+    Serial.print("[DEBUG] Starting rigorous recognition. Requires ");
+    Serial.print(consecutiveEqualDegree);
+    Serial.print(" consecutive matches. Max retries: ");
+    Serial.println(maxRetry);
+#endif
+
+    for (uint16_t attempt = 1; attempt <= maxRetry; ++attempt) {
+#if DE_BUG
+        Serial.print("[DEBUG] Attempt ");
+        Serial.print(attempt);
+        Serial.print("/");
+        Serial.println(maxRetry);
+#endif
+
+        if (!trafficLightRecognize(&currentColor)) {
+#if DE_BUG
+            Serial.println("[WARN] Recognition failed, resetting counter");
+#endif
+            consecutiveCount = 0;
+            lastStableColor = K_NONE;
+            continue;
+        }
+
+        // 颜色状态机逻辑
+        if (currentColor != lastStableColor) {
+#if DE_BUG
+            Serial.print("[INFO] Color changed from ");
+            logObj(lastStableColor);
+            Serial.print(" to ");
+            logObj(currentColor);
+            Serial.println(", resetting counter");
+#endif
+            lastStableColor = currentColor;
+            consecutiveCount = 1;
+            continue;
+        }
+
+        consecutiveCount++;
+#if DE_BUG
+        Serial.print("[DEBUG] Consecutive match (");
+        Serial.print(consecutiveCount);
+        Serial.println(")");
+#endif
+
+        // 达到稳定条件
+        if (consecutiveCount >= consecutiveEqualDegree) {
+#if DE_BUG
+            Serial.print("[SUCCESS] Stable color confirmed: ");
+            logObj(currentColor);
+            Serial.println();
+#endif
+            *k210Color = currentColor;
+            break;
+        }
+    }
+
+#if DE_BUG
+    Serial.println("[ERROR] Failed to reach stable recognition");
+#endif
+    receiveTrack = true;
+    return consecutiveCount >= consecutiveEqualDegree;
+}
+
 bool K230::ping() {
+    receiveTrack = true;
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x92, 0xFE, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
     uint8_t serviceIds[] = {0x92, 0xFE};
-    return awaitReturn(buf, serviceIds, 2);
+    bool successful = awaitReturn(buf, serviceIds, 2);
+    receiveTrack = false;
+    return successful;
 }
 
 void K230::loop() {
@@ -532,28 +619,222 @@ void K230::loop() {
         return;
     }
 
+    uint8_t buf[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
     if (ExtSRAMInterface.ExMem_Read(readBus) == 0x00) {
         return;
     }
 
-    uint8_t buf[8] = {};
+    ExtSRAMInterface.ExMem_Read_Bytes(readBus, buf, 8);
 
-    ExtSRAMInterface.ExMem_Write_Bytes(readBus, buf, 8);
-
-#if DE_BUD
-    Serial.print("k230 loop read:");
+#if DE_BUG
+    Serial.print("[DEBUG] k230 loop read:");
     logHex(buf, 8);
 #endif
-
-    if (!check(buf, 0x91)) {
+    uint8_t sbuf[] = {0x091, 0x01};
+    if (!check(buf, sbuf, 2)) {
         return;
     }
 
-#if DE_BUD
+#if DE_BUG
+    Serial.print("[DEBUG] trackFlagBit:");
+    logHex(buf[4]);
     Serial.println();
 #endif
 
-    trackFlagBit = uint16_t(buf[3]) << 8 || buf[4];
+    trackFlagBit = buf[4];
+
+
+}
+
+/***
+ * 到弯停车状态
+ */
+/*
+static const uint8_t TO_BEND_PARKING_CONDITIONS[] = {
+        0b11110000, // 0xf0
+        0b11100001, // 0xE1
+        0b11000011, // 0xC3
+        0b10000111, // 0x87
+        0b00001111, // 0x0F
+        0b10000001, // 0x81
+        0b11000000, // 0xC0
+        0b00000011, // 0x03
+        0b00011111, // 0x1F
+        0b11110001, // 0xF1
+        0b11111000, // 0xF8
+        0b11111100, // 0xFC
+        0b00111111, // 0x3F
+        0b00000001, // 0x01
+        0b10000000, // 0x80
+        0b11000001, // 0xC1
+        0b10000011, // 0x83
+        0b11100000, // 0xE0
+        0b00000111,  // 0x07
+};
+*/
+
+void turnLeft(uint8_t carSpeed) {
+
+}
+
+void turnRight(uint8_t carSpeed) {
+
+}
+
+/***
+ * 直行到下一个路口
+ * @param carSpeed
+ */
+void straightLine(uint8_t carSpeed) {
+
+    bool inBend = false;  // 弯道状态标志
+    const uint8_t bendThreshold = 6; // 弯道检测阈值（6个以上1）
+    const float KP = 15.0f;      // 比例系数（需实际调试）
+
+    DCMotor.SpeedCtr(carSpeed, carSpeed);
+
+    while (true) {
+        uint8_t trackFlagBit = k230.getTrackFlagBit();
+        uint8_t bitCount = countBits(trackFlagBit);
+
+        if (bitCount >= bendThreshold) {
+            inBend = true;
+            DCMotor.SpeedCtr(carSpeed, carSpeed);
+            return;
+        }
+
+        int sum = 0;
+        uint8_t validBits = 0;
+
+        for (uint8_t i = 0; i < 8; i++) {
+            if (trackFlagBit & (1 << i)) {
+                sum += i;
+                validBits++;
+            }
+        }
+
+        if (trackFlagBit == 0) {
+
+        }
+
+        /*if (memchr(TO_BEND_PARKING_CONDITIONS, trackFlagBit, sizeof(TO_BEND_PARKING_CONDITIONS) / sizeof(TO_BEND_PARKING_CONDITIONS[0]))) {
+            *//*OpenMV_Stop();
+            OpenMV_TrackNewtime(10, 1000);
+            OpenMVTrack_Disc_CloseUpNEW();*//*
+            break;
+        }*/
+
+
+    }
+}
+
+void OpenMV_TrackNew(uint8_t Car_Speed, bool CARZT) {
+    // Servo_Control(-45);
+    // delay(500);
+    uint32_t num = 0;
+    float error, left_speed, right_speed;
+    // 清空串口缓存
+    while (ExtSRAMInterface.ExMem_Read(0x6038) != 0x00) {
+        ExtSRAMInterface.ExMem_Read_Bytes(0x6038, Data_OpenMVBuf, 1);
+    }
+    delay(500);
+    //发开始
+    OpenMVTrack_Disc_StartUpNEW();
+    ExtSRAMInterface.ExMem_Read_Bytes(0x6038, Data_OpenMVBuf, 8);
+
+    DCMotor.SpeedCtr(Car_Speed, Car_Speed);
+    while (1) {
+        if (ExtSRAMInterface.ExMem_Read(0x6038) != 0x00)  // 检测OpenMV识别结果
+        {
+            ExtSRAMInterface.ExMem_Read_Bytes(0x6038, Data_OpenMVBuf, 8);
+            if (CARZT) {
+                if (Data_OpenMVBuf[5] == 0xf0 || Data_OpenMVBuf[5] == 0xE1 || Data_OpenMVBuf[5] == 0xC3 || Data_OpenMVBuf[5] == 0x87 || Data_OpenMVBuf[5] == 0x0F || Data_OpenMVBuf[5] == 0x81 || Data_OpenMVBuf[5] == 0xC0 ||
+                    Data_OpenMVBuf[5] == 0X03 || Data_OpenMVBuf[5] == 0X1F || Data_OpenMVBuf[5] == 0XF1 || Data_OpenMVBuf[5] == 0XF8 || Data_OpenMVBuf[5] == 0XFC || Data_OpenMVBuf[5] == 0X3F || Data_OpenMVBuf[5] == 0X01 ||
+                    Data_OpenMVBuf[5] == 0X80 || Data_OpenMVBuf[5] == 0XC1 || Data_OpenMVBuf[5] == 0X83 || Data_OpenMVBuf[5] == 0XE0 || Data_OpenMVBuf[5] == 0X07)  // 转弯到了中心
+                {
+                    OpenMV_Stop();
+                    OpenMV_TrackNewtime(10, 1000);
+
+                    OpenMVTrack_Disc_CloseUpNEW();
+                    break;
+                }
+            }
+            if ((Data_OpenMVBuf[0] == 0x55) && (Data_OpenMVBuf[1] == 0x02) && (Data_OpenMVBuf[2] == 0x91)) {
+                switch (Data_OpenMVBuf[5]) {
+                    //偏差大
+                    case 0X80:
+                        DCMotor.SpeedCtr(0, 80);
+                        break;
+                    case 0XC0:
+                        DCMotor.SpeedCtr(0, 70);
+                        break;
+                    case 0XE0:
+                        DCMotor.SpeedCtr(0, 60);
+                        break;
+                        //偏差中
+                    case 0X60:
+                        DCMotor.SpeedCtr(0, 60);
+                        break;
+                    case 0X70:
+                        DCMotor.SpeedCtr(0, 50);
+                        break;
+                    case 0X30:
+                        DCMotor.SpeedCtr(0, 40);
+                        break;
+                        //偏差小
+                    case 0X38:
+                        DCMotor.SpeedCtr(10, 40);
+                        break;
+                        //无需修正
+                    case 0X18:
+                        DCMotor.SpeedCtr(20, 30);
+                        break;
+                    case 0X08:
+                        DCMotor.SpeedCtr(10, 10);
+                        break;
+                    case 0x10:
+                        DCMotor.SpeedCtr(30, 20);
+                        break;
+                        //偏差小
+                    case 0X1C:
+                        DCMotor.SpeedCtr(40, 10);
+                        break;
+                        //偏差中
+                    case 0X0C:
+                        DCMotor.SpeedCtr(40, 0);
+                        break;
+                    case 0X0E:
+                        DCMotor.SpeedCtr(50, 0);
+                        break;
+                    case 0X06:
+                        DCMotor.SpeedCtr(60, 0);
+                        break;
+                        //偏差大
+                    case 0X07:
+                        DCMotor.SpeedCtr(60, 0);
+                        break;
+                    case 0X03:
+                        DCMotor.SpeedCtr(70, 0);
+                        break;
+                    case 0X01:
+                        DCMotor.SpeedCtr(80, 0);
+                        break;
+                    default:
+                        DCMotor.SpeedCtr(Car_Speed, Car_Speed);
+                        break;
+                }
+                if (Data_OpenMVBuf[5] == 0xff || Data_OpenMVBuf[5] == 0x7F || Data_OpenMVBuf[5] == 0x3F || Data_OpenMVBuf[5] == 0x1F || Data_OpenMVBuf[5] == 0x0F || Data_OpenMVBuf[5] == 0xFE || Data_OpenMVBuf[5] == 0xFC ||
+                    Data_OpenMVBuf[5] == 0xF8 || Data_OpenMVBuf[5] == 0xF0)  // 路口
+                {
+                    OpenMV_Stop();
+                    OpenMV_TrackNewtime(10, 1100);
+                    OpenMVTrack_Disc_CloseUpNEW();
+                    break;
+                }
+            }
+        }
+    }
 }
 
 AlarmDesk alarmDeskA(0x07);

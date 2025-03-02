@@ -108,6 +108,7 @@ void loop() {
 defineTask(TaskMain);
 defineTask(TaskCar);
 
+
 void l_setup() {
     Serial.begin(115200);
     // 初始化串口通信，波特率115200
@@ -145,10 +146,9 @@ void l_setup() {
 
     mySCoop.start();
 
-    Serial.println("init end");
+    Serial.print("init end");
 
 }
-
 
 void l_loop() {
     yield();
@@ -196,7 +196,7 @@ void TaskMain::loop() {
 }
 
 void TaskCar::setup() {
-
+    k230.setTrackModel(true);
 }
 
 void TaskCar::loop() {
@@ -212,7 +212,7 @@ void TaskCar::loop() {
 
 
 void KEY_Handler(uint8_t k_value) {
-#if DE_BUD
+#if DE_BUG
     Serial.print("KEY_Handler:");
     logHex(k_value);
     Serial.println();

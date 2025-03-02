@@ -20,4 +20,5 @@ void car_setCameraSteeringGearAngle(int8_t angle);
  */
 void car_ledShine(int number, int wait);
 
+
 #endif //ENTOURAGE_CLION_CARCONTROL_H

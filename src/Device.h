@@ -39,7 +39,7 @@ enum Weather {
     /***
      * 阴天
      */
-    OVERCAST_SKY = 0x05,
+    OVERCAST_SKY = 0x05
 };
 
 /***
@@ -72,6 +72,16 @@ enum K210Color {
     K_GREEN = 0x04,
     K_YELLOW = 0x05,
 };
+
+void logObj(Weather weather);
+
+void logObj(TextEncodingFormat textEncodingFormat);
+
+void logObj(TimingMode timingMode);
+
+void logObj(TrafficLightModel trafficLightModel);
+
+void logObj(K210Color k210Color);
 
 class DeviceBase {
 public:
@@ -111,7 +121,10 @@ class AlarmDesk : DeviceBase {
 public:
     explicit AlarmDesk(uint8_t id);
 
-    void openByInfrared();
+    /***
+     * 使用红外线开启报警台，默认开启码是6位
+     */
+    void openByInfrared(uint8_t* openCode);
 
     /***
      * 获取救援位置
@@ -192,12 +205,12 @@ public:
     /***
     * 查询RTC当前日期
     */
-    void getRtcDate(uint8_t* yy, uint8_t* MM, uint8_t* dd);
+    bool getRtcDate(uint8_t* yy, uint8_t* MM, uint8_t* dd);
 
     /***
      * 查询RTC当前时间
      */
-    void getRtcTime(uint8_t* HH, uint8_t* mm, uint8_t* ss);
+    bool getRtcTime(uint8_t* HH, uint8_t* mm, uint8_t* ss);
 
     /***
      * 设置天气数据与温度数据
@@ -207,7 +220,7 @@ public:
     /***
      * 请求回传天气数据与温度数据
      */
-    void getWeatherTemperature(Weather* weather, uint8_t* temperature);
+    bool getWeatherTemperature(Weather* weather, uint8_t* temperature);
 
     /***
      * 开始合成语言
@@ -365,7 +378,7 @@ public:
      * 该函数需要开启寻迹
      * @return
      */
-    uint16_t getTrackFlagBit();
+    uint8_t getTrackFlagBit();
 
     /***
      *
@@ -379,7 +392,16 @@ public:
      * 检测红绿灯
      * @param color
      */
-    bool K230::trafficLightRecognize(K210Color* k210Color);
+    bool trafficLightRecognize(K210Color* k210Color);
+
+    /***
+     * 多从重复以获取精准的值
+     * @param k210Color
+     * @param consecutiveEqualDegree 相同值连续出现的次数
+     * @param maxRetry 最大重试次数
+     * @return
+     */
+    bool trafficLightRecognize_rigorous(K210Color* k210Color, uint16_t consecutiveEqualDegree = 3, uint16_t maxRetry = 48);
 
     /***
      * 测试连接用的
@@ -391,7 +413,7 @@ public:
 
 private:
     bool receiveTrack;
-    uint16_t trackFlagBit;
+    uint8_t trackFlagBit;
 
 };
 

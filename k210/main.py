@@ -1,5 +1,6 @@
 import binascii
 import gc
+import _thread
 
 import lcd
 import sensor
@@ -31,11 +32,42 @@ COLOR_TO_STRING_MAP = {
     GREEN: "GREEN",
     YELLOW: "YELLOW"
 }
+COLOR_TO_RBG_MAP = {
+    NONE: (0, 0, 0),
+    WHITE: (255, 255, 255),
+    BLACK: (0, 0, 0),
+    RED: (255, 0, 0),
+    GREEN: (0, 255, 0),
+    YELLOW: (255, 255, 0),
+}
 
 
-def colorToeString(color):
+# endregion
+
+# region Util
+
+
+def colorToString(color):
     return COLOR_TO_STRING_MAP[color]
     pass
+
+
+def colorToRbg(color):
+    return COLOR_TO_RBG_MAP[color]
+
+
+def max(array):
+    _max = float('-inf')
+    for i in array:
+        _max = _max if _max < i else i
+    return _max
+
+
+def min(array):
+    _min = float('inf')
+    for i in array:
+        _min = _min if _min > i else i
+    return _min
 
 
 # endregion
@@ -48,7 +80,7 @@ def init():
     initTime()
     initPwm()
     initCameraHighRes()
-    initColorExtraction()
+    # initColorExtraction()
     initTrack()
     pass
 
@@ -72,9 +104,12 @@ def initGpio():
 
 # region TIME
 uartTime = None
-#sendTime = None
+sendTime = None
 pwmTime = None
-trackTime = None
+
+
+# trackTime = None
+
 
 def initTime():
     global uartTime
@@ -83,8 +118,9 @@ def initTime():
     uartTime = Timer(Timer.TIMER1, Timer.CHANNEL1, mode=Timer.MODE_PERIODIC, period=50, callback=uartReadBack)
     uartTime.start()
     pwmTime = Timer(Timer.TIMER0, Timer.CHANNEL0, mode=Timer.MODE_PWM)
-    trackTime = Timer(Timer.TIMER2, Timer.CHANNEL2, mode=Timer.MODE_PERIODIC, period=50, callback=trackLoop)
-    #sendTime = Timer(Timer.TIMER3, Timer.CHANNEL3, mode=Timer.MODE_PERIODIC, period=200, callback=planSend)
+    trackTime = Timer(Timer.TIMER2, Timer.CHANNEL2, mode=Timer.MODE_PERIODIC, period=100, callback=sendTrack)
+    trackTime.start()
+    # sendTime = Timer(Timer.TIMER3, Timer.CHANNEL3, mode=Timer.MODE_PERIODIC, period=200, callback=planSend)
     pass
 
 
@@ -108,7 +144,6 @@ def initPwm():
 uart = None
 
 _uart_buffer = b''
-
 
 
 def initUart():
@@ -167,13 +202,14 @@ def handleInstruction(buf):
         return
     if buf[2] == 0x91:
         if buf[3] == 0x01:
-            setTrack(True)
+            if buf[4] == 0x01:
+                setTrack(True)
+            if buf[4] == 0x02:
+                setTrack(False)
         if buf[3] == 0x02:
-            setTrack(False)
-        if buf[3] == 0x03:
             byte = buf[4]
             angle = (byte ^ 0x80) - 0x80
-            angle = angle if angle < -80 else angle if angle > 30 else angle
+            angle = angle if angle < -80 else angle if angle > 20 else angle
             setCameraSteeringGearAngle(angle)
     if buf[2] == 0x92:
         if buf[3] == 0x01:
@@ -192,8 +228,6 @@ def send(buf):
         log("send:" + str(byteBuf))
     uart.write(byteBuf)
     pass
-
-
 
 
 def judgment(buf):
@@ -219,7 +253,36 @@ def initCameraHighRes():
     sensor.set_vflip(1)  # 将摄像头设置成后置方式（所见即所得）
     sensor.set_pixformat(sensor.RGB565)  # 设置像素格式为彩色 RGB565
     sensor.set_framesize(sensor.QVGA)  # 设置帧大小为 VGA (640x480)
-    sensor.skip_frames(time=2000)  # 等待设置生效
+    sensor.skip_frames(time=200)  # 等待设置生效
+    print("Camera initialized")
+
+
+# 灰度摄像机
+def grayscaleCamera():
+    lcd.init(freq=15000000)
+    sensor.reset()
+    sensor.set_vflip(1)
+    sensor.set_pixformat(sensor.GRAYSCALE)
+    sensor.set_framesize(sensor.QVGA)
+    # sensor.set_auto_gain(False)
+    # sensor.set_auto_whitebal(False, gain_db=16)
+    sensor.skip_frames(time=200)
+    print("Camera initialized")
+
+
+def initRgb():
+    '''
+    初始化感光芯片
+    '''
+    lcd.init(freq=15000000)  # 初始化LCD
+    sensor.reset()  # 复位和初始化摄像头
+    sensor.set_vflip(1)  # 将摄像头设置成后置方式（所见即所得）
+    sensor.set_pixformat(sensor.RGB565)  # 设置像素格式为彩色 RGB565
+    sensor.set_framesize(sensor.QVGA)  # 设置帧大小为 QVGA (320x240)
+    sensor.set_auto_gain(False)
+    sensor.set_auto_whitebal(False)
+    # sensor.set_auto_gain(0,0)
+    sensor.skip_frames(time=200)  # 等待设置生效
     print("Camera initialized")
 
 
@@ -242,70 +305,84 @@ def setCameraSteeringGearAngle(angle):
 
 
 # region 寻迹
-trackFlag = False
+openTrack = True
 
-# ROI区域权重值
-ROIS_WEIGHT = [1, 1, 1, 1]
+## ROI区域权重值
+# ROIS_WEIGHT = [1, 1, 1, 1]
+#
+# DISTORTION_FACTOR = 1  # 设定畸变系数
+# IMG_WIDTH = 240
+# IMG_HEIGHT = 320
 
-DISTORTION_FACTOR = 1  # 设定畸变系数
-IMG_WIDTH = 240
-IMG_HEIGHT = 320
+trackFlagBit = 0
+
+# 定义一个列表 rectangles，包含8个元组，每个元组表示一个矩形的左上角坐标 (x, y)。
+RECTANGLES = [(160, 5), (160, 35), (160, 65), (160, 95), (160, 125), (160, 155), (160, 185), (160, 215)]
+LINE_COLOR_THRESHOLD = [(0, 45)]
 
 
 def initTrack():
     pass
 
 
-def trackLoop(e):
-    hasIntersection = False
-    hasCard = False
-    center_num = 0
+def track(img, outImg=None, sendRecognize=False):
+    global trackFlagBit
+    _rackFlagBit = 0
 
-    # 偏转值计算，ROI中心区域X值
-    centroid_sum = (
-            up.cx * ROIS_WEIGHT[0]
-            + middle_up.cx * ROIS_WEIGHT[1]
-            + middle_down.cx * ROIS_WEIGHT[2]
-            + down.cx * ROIS_WEIGHT[3]
-    )
+    for x, y in RECTANGLES:
+        img.draw_rectangle(x, y, 20, 20, color=(0, 255, 0), thickness=2, fill=False)
 
-    if up.blob_flag:
-        center_num += ROIS_WEIGHT[0]
-    if middle_up.blob_flag:
-        center_num += ROIS_WEIGHT[1]
-    if middle_down.blob_flag:
-        center_num += ROIS_WEIGHT[2]
-    if down.blob_flag:
-        center_num += ROIS_WEIGHT[3]
-    center_pos = centroid_sum / (ROIS_WEIGHT[0] + ROIS_WEIGHT[1] + ROIS_WEIGHT[2] + ROIS_WEIGHT[3])
-    deflection_angle = (IMG_WIDTH / 2) - center_pos
+    for i, (x, y) in enumerate(RECTANGLES):
+        w, h = 20, 20
+        # 定义矩形的宽度和高度为 20 像素。
 
-    if left.cy <= (IMG_HEIGHT / 3) or right.cy <= (IMG_HEIGHT / 3):
-        # 当最下方ROI区域的黑线宽度大于120像素（检测到路口）
-        if down.w > 120:
-            hasIntersection = True
+        # Perform color thresholding in the region of interest (ROI)
+        # 在感兴趣区域 (ROI) 内进行颜色阈值检测。
+        blobs = img.find_blobs(LINE_COLOR_THRESHOLD, roi=(x, y, w, h))
 
-    if middle_up.w > 40:
-        if left.w > 30 or right.w > 30:
-            if middle.w < 50:
-                hasCard = True
+        # Check if any blob's area is greater than 100
+        # 检查是否有任意一个色块的面积大于 100。
+        for blob in blobs:
+            if blob.area() > 100:
+                outImg.draw_rectangle(x, y, 20, 20, color=(0, 255, 0), thickness=2, fill=True)
+                outImg.draw_string(x, y, str(i))
 
-    # if middle_up.blob_flag and middle_down.blob_flag:
-    #    if car.w > 0:
-    #        print("中间")
-    #        hasIntersection = True
+                _rackFlagBit |= 1 << (7 - i)
+                # why 为啥不是  _rackFlagBit |= 1 << i
+                # 请渡学长的遗物
+                # bools = [False] * 8
+                # .....
+                # bools[i] = True
+                # .....
+                # binary_str = ''.join(['1' if b else '0' for b in bools])
+                # hex_value = int(binary_str, 2)
+                break
 
-    return hasIntersection, deflection_angle, hasCard
+    trackFlagBit = _rackFlagBit
+
+    if sendRecognize:
+        sendTrack(None)
+
     pass
 
 
+def sendTrack(e):
+    send([
+        DATA_FRAME_HEADER,
+        NATIVE_IDENTIFIER,
+        0x91,
+        0x01,
+        trackFlagBit,
+        0x00,
+        0x00,
+        DATA_FRAME_TAIL
+    ])
+
+
 def setTrack(open):
-    global trackFlag
-    trackFlag = open
-    if trackFlag:
-        trackTime.start()
-    else:
-        trackTime.stop()
+    global openTrack
+    openTrack = open
+
     pass
 
 
@@ -313,74 +390,74 @@ def setTrack(open):
 
 
 # region 取色
-class ColorBlock:
-    roi = (0, 0, 0, 0)
-
-    cx = 0
-    cy = 0
-    w = 0
-    blob_flag = False
-
-    def __new__(cls, rest):
-        cls.roi = rest
-        return super().__new__(cls)
-
-
-left = ColorBlock((0, 0, 180, 50))  # 纵向取样-左侧
-right = ColorBlock((0, 190, 180, 50))  # 纵向取样-右侧
-up = ColorBlock((240, 0, 80, 240))  # 横向取样-上方
-middle_up = ColorBlock((160, 0, 80, 240))  # 横向取样-中上
-middle_down = ColorBlock((80, 0, 80, 240))  # 横向取样-中下
-down = ColorBlock((0, 0, 80, 240))  # 横向取样-下方
-car = ColorBlock((0, 50, 120, 140))
-middle = ColorBlock((80, 80, 80, 80))
-
-colorBlockList = {
-    left,
-    right,
-    up,
-    middle_up,
-    middle_down,
-    down,
-    car,
-    middle
-}
-
-LINE_COLOR_THRESHOLD = [(0, 31, -18, 23, -23, 27)]
-
-
-def initColorExtraction():
-    pass
-
-
-def colorExtractionLoop(img, outImg=None):
-    '''
-    说明：在ROIS中寻找色块，获取ROI中色块的中心区域与是否有色块的信息
-    '''
-
-    for colorBlock in colorBlockList:
-        blobs = img.find_blobs(LINE_COLOR_THRESHOLD, roi=colorBlock.roi, merge=True)
-        if len(blobs) == 0:
-            continue
-        largest_blob = max(blobs, key=lambda b: b.pixels())
-        if largest_blob.area() < 1000:
-            continue
-        colorBlock.cx = largest_blob.cy()  # 传（学长）说，此处获取到的值的放的，所以反正赋值——反正它能跑
-        colorBlock.cy = largest_blob.cx()
-        colorBlock.w = largest_blob.h()
-        colorBlock.blob_flag = True
-        if outImg is not None:
-            x, y, width, height = largest_blob[:4]
-            outImg.draw_rectangle((x, y, width, height), color=(128))
-
-    pass
+# class ColorBlock:
+#    roi = (0, 0, 0, 0)
+#
+#    cx = 0
+#    cy = 0
+#    w = 0
+#    blob_flag = False
+#
+#    def __new__(cls, rest):
+#        cls.roi = rest
+#        return super().__new__(cls)
+#
+#
+# left = ColorBlock((0, 0, 180, 50))  # 纵向取样-左侧
+# right = ColorBlock((0, 190, 180, 50))  # 纵向取样-右侧
+# up = ColorBlock((240, 0, 80, 240))  # 横向取样-上方
+# middle_up = ColorBlock((160, 0, 80, 240))  # 横向取样-中上
+# middle_down = ColorBlock((80, 0, 80, 240))  # 横向取样-中下
+# down = ColorBlock((0, 0, 80, 240))  # 横向取样-下方
+# car = ColorBlock((0, 50, 120, 140))
+# middle = ColorBlock((80, 80, 80, 80))
+#
+# colorBlockList = {
+#    left,
+#    right,
+#    up,
+#    middle_up,
+#    middle_down,
+#    down,
+#    car,
+#    middle
+# }
+#
+# LINE_COLOR_THRESHOLD = [(0, 31, -18, 23, -23, 27)]
+#
+#
+# def initColorExtraction():
+#    pass
+#
+#
+# def colorExtractionLoop(img, outImg=None):
+#    '''
+#    说明：在ROIS中寻找色块，获取ROI中色块的中心区域与是否有色块的信息
+#    '''
+#
+#    for colorBlock in colorBlockList:
+#        blobs = img.find_blobs(LINE_COLOR_THRESHOLD, roi=colorBlock.roi, merge=True)
+#        if len(blobs) == 0:
+#            continue
+#        largest_blob = max(blobs, key=lambda b: b.pixels())
+#        if largest_blob.area() < 1000:
+#            continue
+#        colorBlock.cx = largest_blob.cy()  # 传（学长）说，此处获取到的值的放的，所以反正赋值——反正它能跑
+#        colorBlock.cy = largest_blob.cx()
+#        colorBlock.w = largest_blob.h()
+#        colorBlock.blob_flag = True
+#        if outImg is not None:
+#            x, y, width, height = largest_blob[:4]
+#            outImg.draw_rectangle((x, y, width, height), color=(128))
+#
+#    pass
 
 
 # endregion
 
 
 # region 二维码
-def qrRecognize(img, outImg=None):
+def qrRecognize(img, outImg=None, sendRecognize=True):
     if isDebug:
         log("qrRecognize...")
         pass
@@ -392,18 +469,19 @@ def qrRecognize(img, outImg=None):
         log("count:" + str(qrcodesLen))
         pass
 
-    buf = [
-        DATA_FRAME_HEADER,
-        NATIVE_IDENTIFIER,
-        0x92,
-        0x01,
-        0x01,  # 同步数量
-        qrcodesLen,
-        0x00,
-        DATA_FRAME_TAIL
-    ]
-    # noinspection PyTypeChecker
-    send(buf)
+    if sendRecognize:
+        buf = [
+            DATA_FRAME_HEADER,
+            NATIVE_IDENTIFIER,
+            0x92,
+            0x01,
+            0x01,  # 同步数量
+            qrcodesLen,
+            0x00,
+            DATA_FRAME_TAIL
+        ]
+        # noinspection PyTypeChecker
+        send(buf)
 
     for i in range(qrcodesLen):
         qr = qrcodes[i]
@@ -434,26 +512,24 @@ def qrRecognize(img, outImg=None):
             log("message:" + qr.payload())
             pass
 
-        buf = ([
-                   DATA_FRAME_HEADER,
-                   NATIVE_IDENTIFIER,
-                   0x92,
-                   0x01,
-                   0x02,  # 同步数据
-                   i,
-                   colorId,
-                   len(qr.payload().encode())
-               ]
-               + list(qr.payload().encode())
-               + [
-                   0x00,
-                   DATA_FRAME_TAIL
-               ])
+        if sendRecognize:
+            buf = ([
+                       DATA_FRAME_HEADER,
+                       NATIVE_IDENTIFIER,
+                       0x92,
+                       0x01,
+                       0x02,  # 同步数据
+                       i,
+                       colorId,
+                       len(qr.payload().encode())
+                   ]
+                   + list(qr.payload().encode())
+                   + [
+                       0x00,
+                       DATA_FRAME_TAIL
+                   ])
 
-
-        send(buf)
-        pass
-    pass
+            send(buf)
 
 
 def identifyQrCodeColor(img):
@@ -496,46 +572,72 @@ TL_YELLOW_RADIUS = [
 ]
 
 
-def trafficLightRecognize(img, outImg=None):
+def trafficLightRecognize(img, outImg=None, sendRecognize=True):
     if isDebug:
         log("trafficLightRecognize...")
         pass
 
-    R = len(img.find_blobs(TL_RED_RADIUS, x_stride=20, y_stride=20, area_threshold=20, pixels_threshold=5))
-    G = len(img.find_blobs(TL_GREEN_RADIUS, x_stride=20, y_stride=20, area_threshold=20, pixels_threshold=5))
-    Y = len(img.find_blobs(TL_YELLOW_RADIUS, x_stride=20, y_stride=20, area_threshold=20, pixels_threshold=5))
+    rBlobs = img.find_blobs(TL_RED_RADIUS, x_stride=20, y_stride=20, area_threshold=20, pixels_threshold=5)
+    gBlobs = img.find_blobs(TL_GREEN_RADIUS, x_stride=20, y_stride=20, area_threshold=20, pixels_threshold=5)
+    yBlobs = img.find_blobs(TL_YELLOW_RADIUS, x_stride=20, y_stride=20, area_threshold=20, pixels_threshold=5)
 
-    color = None
+    R = 0
+    G = 0
+    Y = 0
 
-    if R > G:
+    for blob in rBlobs:
+        R += blob.area()
+    for blob in gBlobs:
+        G += blob.area()
+    for blob in yBlobs:
+        Y += blob.area()
+
+    if outImg is not None:
+        for blob in rBlobs:
+            outImg.draw_rectangle(
+                blob.rect(),
+                color=colorToRbg(RED)
+            )
+        for blob in gBlobs:
+            outImg.draw_rectangle(
+                blob.rect(),
+                color=colorToRbg(GREEN)
+            )
+        for blob in yBlobs:
+            outImg.draw_rectangle(
+                blob.rect(),
+                color=colorToRbg(YELLOW)
+            )
+
+    color = NONE
+
+    if R > G and R > Y:
         color = RED
-    elif G > R:
+    if G > R and G > Y:
         color = GREEN
-    else:
+    if Y > R and Y > G:
         color = YELLOW
 
     if isDebug:
-        log("recognize:" + colorToeString(color))
+        log("r:" + str(R) + " g:" + str(G) + "y:" + str(Y) + " recognize:" + colorToString(color))
         pass
 
-    buf = bytearray([
-        DATA_FRAME_HEADER,
-        NATIVE_IDENTIFIER,
-        0x92,
-        0x03,
-        color,
-        0x00,
-        0x00,
-        DATA_FRAME_TAIL
-    ])
+    if sendRecognize:
+        buf = bytearray([
+            DATA_FRAME_HEADER,
+            NATIVE_IDENTIFIER,
+            0x92,
+            0x03,
+            color,
+            0x00,
+            0x00,
+            DATA_FRAME_TAIL
+        ])
 
-    send(buf)
-
-    pass
+        send(buf)
 
 
 # endregion
-
 
 # region PING
 def pinged():
@@ -553,7 +655,6 @@ def pinged():
 
 
 # endregion
-
 
 # region LOG
 LOG_MAX_LINES = 13  # 最大显示行数
@@ -585,23 +686,36 @@ def drawLogs(img):
 
 # endregion
 
+# def logicalThread():
+#    while True:
+#        uartReadBack()
+#        if trackSend:
+#            sendTrack()
+#        time.sleep(0.05)
+#        pass
+
 
 primitiveImg = None
 
 if __name__ == '__main__':
     init()
     log("initEnd")
+
     setCameraSteeringGearAngle(-55)
 
     while True:
         try:
             gc.collect()
-
             img = sensor.snapshot().lens_corr(strength=1.5, zoom=1.0)
-
             primitiveImg = img.copy()
 
-            colorExtractionLoop(primitiveImg, img)
+            # colorExtractionLoop(primitiveImg, img)
+
+            # trafficLightRecognize(primitiveImg, img, False)
+
+            if openTrack:
+                track(primitiveImg, img, False)
+
             drawLogs(img)
 
             lcd.display(img)
