@@ -169,9 +169,8 @@ void TaskMain::setup() {
 
 void TaskMain::loop() {
 
-    CoreKEY.Kwhile(KEY_Handler);
 
-    k230.loop();
+    //k230.loop();
 
     if (((millis() - frisrtime >= TSendCycle) || (Tcount >= TSendCycle)) && (sendflag == 1))  //获取、上传任务版数据
     {
@@ -200,6 +199,8 @@ void TaskCar::setup() {
 }
 
 void TaskCar::loop() {
+    CoreKEY.Kwhile(KEY_Handler);
+
     /*if (k230.ping()) {
         carLight.RightTurnOn();
         carLight.LeftTurnOn();
@@ -221,20 +222,87 @@ void KEY_Handler(uint8_t k_value) {
     K210Color k210Color;
     uint8_t count;
 
+    float carSpeed = 20;
 
     switch (k_value) {
         case 0x01:
-            k230.setCameraSteeringGearAngle(0);
-            k230.qrRecognize(&count, qrMessageArray, 4);
+            //k230.setTrackModel(false);
+            //k230.setCameraSteeringGearAngle(0);
+            //k230.qrRecognize(&count, qrMessageArray, 4);
+
+            k230.setCameraSteeringGearAngle(-55);
+            k230.setTrackModel(true);
+            car.straightLine();
+            k230.setTrackModel(false);
+
             break;
         case 0x02:
-            k230.setCameraSteeringGearAngle(0);
-            k230.trafficLightRecognize(&k210Color);
+            //k230.setTrackModel(false);
+            //k230.setCameraSteeringGearAngle(0);
+            //k230.trafficLightRecognize(&k210Color);
+
+
+            //DCMotor.SpeedCtr(50, 50);
+
+            //k230.setCameraSteeringGearAngle(-55);
+            //k230.setTrackModel(true);
+            //car.trimAttitude(60, 10000);
+            //k230.setTrackModel(false);
+            k230.setCameraSteeringGearAngle(-55);
+            k230.setTrackModel(true);
+            for (int i = 0; i < 100; ++i) {
+                car.straightLine();
+                car.turnLeft();
+                car.straightLine();
+                car.turnLeft();
+                car.straightLine();
+                car.turnLeft();
+                car.straightLine();
+                car.turnLeft();
+
+                car.straightLine();
+                car.turnRight();
+                car.straightLine();
+                car.turnRight();
+                car.straightLine();
+                car.turnRight();
+                car.straightLine();
+                car.turnRight();
+            }
+            k230.setTrackModel(false);
+
             break;
         case 0x03:
+            k230.setCameraSteeringGearAngle(-55);
+            k230.setTrackModel(true);
+            car.trimAttitude();
+            k230.setTrackModel(false);
 
             break;
         case 0x04:
+            /*k230.setCameraSteeringGearAngle(-55);
+            k230.setTrackModel(true);
+            car.turnRight();
+            k230.setTrackModel(false);*/
+            unsigned long startTime = millis();
+            k230.setTrackModel(true);
+            while (millis() - startTime < 100000) {
+                uint8_t trackFlagBit;
+                if (!k230.getTrackFlagBit(&trackFlagBit)) {
+                    continue;
+                }
+                float offset = 0;
+                centralPoint(&trackFlagBit, 1, &offset);
+
+                Serial.print("[DEBUG] offset:");
+                Serial.print(offset);
+                Serial.println();
+
+/*#if DE_BUG
+
+#endif*/
+            }
+            k230.setTrackModel(false);
 
             break;
     }

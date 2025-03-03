@@ -115,11 +115,11 @@ def initTime():
     global uartTime
     global pwmTime
     global trackTime
-    uartTime = Timer(Timer.TIMER1, Timer.CHANNEL1, mode=Timer.MODE_PERIODIC, period=50, callback=uartReadBack)
-    uartTime.start()
+    # uartTime = Timer(Timer.TIMER1, Timer.CHANNEL1, mode=Timer.MODE_PERIODIC, period=50, callback=uartReadBack)
+    # uartTime.start()
     pwmTime = Timer(Timer.TIMER0, Timer.CHANNEL0, mode=Timer.MODE_PWM)
-    trackTime = Timer(Timer.TIMER2, Timer.CHANNEL2, mode=Timer.MODE_PERIODIC, period=100, callback=sendTrack)
-    trackTime.start()
+    # trackTime = Timer(Timer.TIMER2, Timer.CHANNEL2, mode=Timer.MODE_PERIODIC, period=100, callback=sendTrack)
+    # trackTime.start()
     # sendTime = Timer(Timer.TIMER3, Timer.CHANNEL3, mode=Timer.MODE_PERIODIC, period=200, callback=planSend)
     pass
 
@@ -305,7 +305,7 @@ def setCameraSteeringGearAngle(angle):
 
 
 # region 寻迹
-openTrack = True
+openTrack = False
 
 ## ROI区域权重值
 # ROIS_WEIGHT = [1, 1, 1, 1]
@@ -381,8 +381,10 @@ def sendTrack(e):
 
 def setTrack(open):
     global openTrack
+    if isDebug:
+        log("setTrack:" + str(open))
     openTrack = open
-
+    trackFlagBit = 0
     pass
 
 
@@ -442,7 +444,7 @@ def setTrack(open):
 #        largest_blob = max(blobs, key=lambda b: b.pixels())
 #        if largest_blob.area() < 1000:
 #            continue
-#        colorBlock.cx = largest_blob.cy()  # 传（学长）说，此处获取到的值的放的，所以反正赋值——反正它能跑
+#        colorBlock.cx = largest_blob.cy()  # 传（学长）说，此处获取到的值的反的，所以反正赋值也是反的~反正它能跑
 #        colorBlock.cy = largest_blob.cx()
 #        colorBlock.w = largest_blob.h()
 #        colorBlock.blob_flag = True
@@ -706,17 +708,20 @@ if __name__ == '__main__':
     while True:
         try:
             gc.collect()
+
             img = sensor.snapshot().lens_corr(strength=1.5, zoom=1.0)
             primitiveImg = img.copy()
+
+            uartReadBack(None)
 
             # colorExtractionLoop(primitiveImg, img)
 
             # trafficLightRecognize(primitiveImg, img, False)
 
             if openTrack:
-                track(primitiveImg, img, False)
+                track(primitiveImg, img, True)
 
-            drawLogs(img)
+            #drawLogs(img)
 
             lcd.display(img)
         except Exception as err:

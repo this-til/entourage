@@ -10,7 +10,7 @@ DeviceBase::DeviceBase(uint8_t id) {
     this->sendBus = 0x6008;
     this->sendLen = 8;
     this->sendVerify = true;
-    this->sendCooling_ms = 200;
+    this->sendCooling_ms = 300;
 
     this->readBus = 0x6100;
     this->readLen = 8;
@@ -357,12 +357,14 @@ K230::K230(uint8_t id) : DeviceBase(id) {
     readVerify = false;
 
     receiveTrack = true;
-    trackFlagBit = 0;
 }
 
 void K230::setTrackModel(bool open) {
-    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x91, 0x01, static_cast<uint8_t>(open ? 0x01 : 0x02), 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x91, 0x01, open ? (uint8_t) 0x01 : (uint8_t) 0x02, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
+
+    uint8_t trackFlagBit;
+    getTrackFlagBit(&trackFlagBit);
 }
 
 void K230::setCameraSteeringGearAngle(int8_t angle) {
@@ -374,8 +376,22 @@ void K230::setCameraSteeringGearAngle(int8_t angle) {
 }
 
 
-uint8_t K230::getTrackFlagBit() {
-    return trackFlagBit;
+bool K230::getTrackFlagBit(uint8_t* trackFlagBit) {
+    uint8_t buf[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    uint8_t sbuf[] = {0x091, 0x01};
+    bool successful = awaitReturn(buf, sbuf, 2);
+    if (successful) {
+        *trackFlagBit = buf[4];
+#if DE_BUG
+        Serial.print("[DEBUG] trackFlagBit:");
+        logHex(buf[4]);
+        Serial.println();
+#endif
+    }
+
+    //ExtSRAMInterface.ExMem_JudgeWrite(readBus, 0x00);
+
+    return successful;
 }
 
 bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen) {
@@ -614,7 +630,7 @@ bool K230::ping() {
     return successful;
 }
 
-void K230::loop() {
+/*void K230::loop() {
     if (!receiveTrack) {
         return;
     }
@@ -645,7 +661,7 @@ void K230::loop() {
     trackFlagBit = buf[4];
 
 
-}
+}*/
 
 /***
  * 到弯停车状态
@@ -674,168 +690,128 @@ static const uint8_t TO_BEND_PARKING_CONDITIONS[] = {
 };
 */
 
-void turnLeft(uint8_t carSpeed) {
+Car::Car() {
+    straightLineSpeed = 20;
+    turnLeftSpeed = 40;
+    turnRightSpeed = 40;
+    straightLineKpSpeed = 10;
+    trimAttitudeKpSpeed = 10;
 
+    outTime_ms = 10000;
+    trimOutTime_ms = 3000;
 }
 
-void turnRight(uint8_t carSpeed) {
-
+void Car::turnLeft() {
+    DCMotor.SpeedCtr(-turnLeftSpeed, turnLeftSpeed);
+    sleep(1600);
+    trimAttitude();
 }
 
-/***
- * 直行到下一个路口
- * @param carSpeed
- */
-void straightLine(uint8_t carSpeed) {
+void Car::turnRight() {
+    DCMotor.SpeedCtr(turnRightSpeed, -turnRightSpeed);
+    sleep(1600);
+    trimAttitude();
+}
 
-    bool inBend = false;  // 弯道状态标志
-    const uint8_t bendThreshold = 6; // 弯道检测阈值（6个以上1）
-    const float KP = 15.0f;      // 比例系数（需实际调试）
 
-    DCMotor.SpeedCtr(carSpeed, carSpeed);
+void Car::straightLine() {
 
-    while (true) {
-        uint8_t trackFlagBit = k230.getTrackFlagBit();
-        uint8_t bitCount = countBits(trackFlagBit);
+    const uint32_t bendThreshold = 5; // 弯道检测阈值（6个以上1）
+    unsigned long startTime = millis();
 
-        if (bitCount >= bendThreshold) {
-            inBend = true;
-            DCMotor.SpeedCtr(carSpeed, carSpeed);
-            return;
+    //trimAttitude();
+
+    DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
+
+    while (millis() - startTime < outTime_ms) {
+        uint8_t trackFlagBit;
+        uint32_t bitCount;
+        float offset = 0;
+
+        acceptTrackFlag(&trackFlagBit, &bitCount, &offset);
+
+        if (offset == -1) {
+            DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
+            continue;
         }
 
-        int sum = 0;
-        uint8_t validBits = 0;
-
-        for (uint8_t i = 0; i < 8; i++) {
-            if (trackFlagBit & (1 << i)) {
-                sum += i;
-                validBits++;
-            }
+        uint8_t edgeBitCount = 0;
+        if (getBit(&trackFlagBit, 1, 0, true)) {
+            edgeBitCount++;
+        }
+        if (getBit(&trackFlagBit, 1, 1, true)) {
+            edgeBitCount++;
+        }
+        if (getBit(&trackFlagBit, 1, 6, true)) {
+            edgeBitCount++;
+        }
+        if (getBit(&trackFlagBit, 1, 7, true)) {
+            edgeBitCount++;
         }
 
-        if (trackFlagBit == 0) {
-
-        }
-
-        /*if (memchr(TO_BEND_PARKING_CONDITIONS, trackFlagBit, sizeof(TO_BEND_PARKING_CONDITIONS) / sizeof(TO_BEND_PARKING_CONDITIONS[0]))) {
-            *//*OpenMV_Stop();
-            OpenMV_TrackNewtime(10, 1000);
-            OpenMVTrack_Disc_CloseUpNEW();*//*
+        if ((edgeBitCount >= 3 || bitCount >= bendThreshold) && millis() - startTime > 500) {
+            DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
+            sleep((int32_t) (23000 / straightLineSpeed));
+            trimAttitude();
             break;
-        }*/
+        }
 
-
+        DCMotor.SpeedCtr(
+                straightLineSpeed + (offset > 0 ? straightLineKpSpeed : -straightLineKpSpeed),
+                straightLineSpeed + (offset > 0 ? -straightLineKpSpeed : straightLineKpSpeed)
+        );
     }
+    DCMotor.Stop();
 }
 
-void OpenMV_TrackNew(uint8_t Car_Speed, bool CARZT) {
-    // Servo_Control(-45);
-    // delay(500);
-    uint32_t num = 0;
-    float error, left_speed, right_speed;
-    // 清空串口缓存
-    while (ExtSRAMInterface.ExMem_Read(0x6038) != 0x00) {
-        ExtSRAMInterface.ExMem_Read_Bytes(0x6038, Data_OpenMVBuf, 1);
+void Car::trimAttitude() {
+    unsigned long startTime = millis();
+    while (millis() - startTime < trimOutTime_ms) {
+        uint8_t trackFlagBit;
+        float offset = 0;
+        acceptTrackFlag(&trackFlagBit, nullptr, &offset);
+        if (offset == -1) {
+            continue;
+        }
+        if (offset == 0) {
+            /*DCMotor.Stop();
+            unsigned long toBendTime = millis();
+            while (millis() - toBendTime < 100) {
+                acceptTrackFlag(&trackFlagBit, nullptr, &offset);
+            }
+            acceptTrackFlag(&trackFlagBit, nullptr, &offset);
+            acceptTrackFlag(&trackFlagBit, nullptr, &offset);*/
+            /*if (offset == 0) {
+                break;
+            }*/
+            break;
+        }
+        DCMotor.SpeedCtr(offset > 0 ? trimAttitudeKpSpeed : -trimAttitudeKpSpeed, offset > 0 ? -trimAttitudeKpSpeed : trimAttitudeKpSpeed);
     }
-    delay(500);
-    //发开始
-    OpenMVTrack_Disc_StartUpNEW();
-    ExtSRAMInterface.ExMem_Read_Bytes(0x6038, Data_OpenMVBuf, 8);
 
-    DCMotor.SpeedCtr(Car_Speed, Car_Speed);
-    while (1) {
-        if (ExtSRAMInterface.ExMem_Read(0x6038) != 0x00)  // 检测OpenMV识别结果
-        {
-            ExtSRAMInterface.ExMem_Read_Bytes(0x6038, Data_OpenMVBuf, 8);
-            if (CARZT) {
-                if (Data_OpenMVBuf[5] == 0xf0 || Data_OpenMVBuf[5] == 0xE1 || Data_OpenMVBuf[5] == 0xC3 || Data_OpenMVBuf[5] == 0x87 || Data_OpenMVBuf[5] == 0x0F || Data_OpenMVBuf[5] == 0x81 || Data_OpenMVBuf[5] == 0xC0 ||
-                    Data_OpenMVBuf[5] == 0X03 || Data_OpenMVBuf[5] == 0X1F || Data_OpenMVBuf[5] == 0XF1 || Data_OpenMVBuf[5] == 0XF8 || Data_OpenMVBuf[5] == 0XFC || Data_OpenMVBuf[5] == 0X3F || Data_OpenMVBuf[5] == 0X01 ||
-                    Data_OpenMVBuf[5] == 0X80 || Data_OpenMVBuf[5] == 0XC1 || Data_OpenMVBuf[5] == 0X83 || Data_OpenMVBuf[5] == 0XE0 || Data_OpenMVBuf[5] == 0X07)  // 转弯到了中心
-                {
-                    OpenMV_Stop();
-                    OpenMV_TrackNewtime(10, 1000);
+    DCMotor.Stop();
+}
 
-                    OpenMVTrack_Disc_CloseUpNEW();
-                    break;
-                }
-            }
-            if ((Data_OpenMVBuf[0] == 0x55) && (Data_OpenMVBuf[1] == 0x02) && (Data_OpenMVBuf[2] == 0x91)) {
-                switch (Data_OpenMVBuf[5]) {
-                    //偏差大
-                    case 0X80:
-                        DCMotor.SpeedCtr(0, 80);
-                        break;
-                    case 0XC0:
-                        DCMotor.SpeedCtr(0, 70);
-                        break;
-                    case 0XE0:
-                        DCMotor.SpeedCtr(0, 60);
-                        break;
-                        //偏差中
-                    case 0X60:
-                        DCMotor.SpeedCtr(0, 60);
-                        break;
-                    case 0X70:
-                        DCMotor.SpeedCtr(0, 50);
-                        break;
-                    case 0X30:
-                        DCMotor.SpeedCtr(0, 40);
-                        break;
-                        //偏差小
-                    case 0X38:
-                        DCMotor.SpeedCtr(10, 40);
-                        break;
-                        //无需修正
-                    case 0X18:
-                        DCMotor.SpeedCtr(20, 30);
-                        break;
-                    case 0X08:
-                        DCMotor.SpeedCtr(10, 10);
-                        break;
-                    case 0x10:
-                        DCMotor.SpeedCtr(30, 20);
-                        break;
-                        //偏差小
-                    case 0X1C:
-                        DCMotor.SpeedCtr(40, 10);
-                        break;
-                        //偏差中
-                    case 0X0C:
-                        DCMotor.SpeedCtr(40, 0);
-                        break;
-                    case 0X0E:
-                        DCMotor.SpeedCtr(50, 0);
-                        break;
-                    case 0X06:
-                        DCMotor.SpeedCtr(60, 0);
-                        break;
-                        //偏差大
-                    case 0X07:
-                        DCMotor.SpeedCtr(60, 0);
-                        break;
-                    case 0X03:
-                        DCMotor.SpeedCtr(70, 0);
-                        break;
-                    case 0X01:
-                        DCMotor.SpeedCtr(80, 0);
-                        break;
-                    default:
-                        DCMotor.SpeedCtr(Car_Speed, Car_Speed);
-                        break;
-                }
-                if (Data_OpenMVBuf[5] == 0xff || Data_OpenMVBuf[5] == 0x7F || Data_OpenMVBuf[5] == 0x3F || Data_OpenMVBuf[5] == 0x1F || Data_OpenMVBuf[5] == 0x0F || Data_OpenMVBuf[5] == 0xFE || Data_OpenMVBuf[5] == 0xFC ||
-                    Data_OpenMVBuf[5] == 0xF8 || Data_OpenMVBuf[5] == 0xF0)  // 路口
-                {
-                    OpenMV_Stop();
-                    OpenMV_TrackNewtime(10, 1100);
-                    OpenMVTrack_Disc_CloseUpNEW();
-                    break;
-                }
-            }
+bool Car::acceptTrackFlag(uint8_t* outTrackFlag, uint32_t* outBitCount, float* outOffset) {
+    uint8_t trackFlag = 0;
+    bool successful = k230.getTrackFlagBit(&trackFlag);
+
+    if (successful) {
+        if (outTrackFlag != nullptr) {
+            *outTrackFlag = trackFlag;
+        }
+        if (outBitCount != nullptr) {
+            uint32_t bitCount = countBits(trackFlag);
+            *outBitCount = bitCount;
+        }
+        if (outOffset != nullptr) {
+            centralPoint(&trackFlag, 1, outOffset);
         }
     }
+
+    return successful;
 }
+
 
 AlarmDesk alarmDeskA(0x07);
 BarrierGate barrierGateA(0x03);

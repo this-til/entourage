@@ -121,3 +121,106 @@ void logObj(K210Color k210Color) {
 #endif
 }
 
+
+uint32_t countBits(const uint8_t* value, uint32_t len) {
+    uint16_t count = 0;
+    for (int i = 0; i < len; ++i) {
+        for (uint8_t ii = 0; ii < 8; ii++) {
+            if (value[i] & (1 << ii)) {
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+uint32_t countBits(uint8_t uint8) {
+    return countBits(&uint8, 1);
+}
+
+
+uint8_t getBit(uint8_t* value, uint32_t len, int32_t bit, bool fromLeftToRight) {
+    if (bit < 0 || bit >= len * 8) {
+        return false;
+    }
+
+    if (fromLeftToRight) {
+        return (value[bit / 8] >> (7 - (bit % 8))) & 0x01;
+    } else {
+        return value[len - (bit / 8) - 1] >> (bit % 8) & 0x01;
+    }
+}
+
+void setBit(uint8_t* value, uint32_t len, int32_t bit, bool set, bool fromLeftToRight) {
+    if (bit < 0 || bit >= len * 8) {
+        return;
+    }
+    if (fromLeftToRight) {
+        if (set) {
+            value[bit / 8] |= 0x80 >> (bit % 8);
+        } else {
+            value[bit / 8] &= ~(0x80 >> (bit % 8));
+        }
+    } else {
+        if (set) {
+            value[len - (bit / 8) - 1] |= (0x01 << (bit % 8));
+        } else {
+            value[len - (bit / 8) - 1] &= ~(0x01 << (bit % 8));
+        }
+    }
+}
+
+void lonelinessExclusion(uint8_t* value, uint32_t len, uint8_t* outValue) {
+    uint32_t mLen = len * 8;
+
+    for (uint32_t i = 0; i < len; ++i) {
+        outValue[i] = value[i];
+    }
+
+
+    for (int32_t i = 0; i < mLen; ++i) {
+        int32_t beforeIn = i - 1;
+        int32_t afterIn = i + 1;
+
+        bool before = getBit(value, len, beforeIn, true);
+        //bool current = (value[i / 8] >> (i % 8)) & 0x01;
+        bool after = getBit(value, len, afterIn, true);
+
+        if (!before && !after) {
+            setBit(outValue, len, i, false, true);
+        }
+
+    }
+}
+
+float centralPoint(uint8_t* value, uint32_t len, float* centerShift) {
+    uint32_t mLen = len * 8;
+    float startingPoint = -1;
+    float endPoint = -1;
+
+    for (int32_t i = 0; i < mLen; ++i) {
+        bool bit = getBit(value, len, i, true);
+        if (bit) {
+            startingPoint = (float) i;
+            break;
+        }
+    }
+
+    if (startingPoint == -1) {
+        *centerShift = 0;
+        return -1;
+    }
+
+    for (int32_t i = 0; i < mLen; ++i) {
+        bool bit = getBit(value, len, i, false);
+        if (bit) {
+            endPoint = (float) (mLen - i - 1);
+            break;
+        }
+    }
+
+    float centralPoint = startingPoint + ((endPoint - startingPoint) / 2);
+    centralPoint += 0.5;
+    *centerShift = centralPoint - (float) mLen / 2;
+    return centralPoint;
+}

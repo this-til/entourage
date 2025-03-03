@@ -378,7 +378,7 @@ public:
      * 该函数需要开启寻迹
      * @return
      */
-    uint8_t getTrackFlagBit();
+    bool getTrackFlagBit(uint8_t* trackFlagBit);
 
     /***
      *
@@ -409,12 +409,10 @@ public:
      */
     bool ping();
 
-    void loop();
+    //void loop();
 
 private:
     bool receiveTrack;
-    uint8_t trackFlagBit;
-
 };
 
 /***
@@ -422,8 +420,34 @@ private:
  * 一些和车有关的，杂七杂八的就扔在这里
  */
 class Car {
+public:
+    Car();
 
+/***
+ * 直行到下一个路口
+ * @param carSpeed
+ */
+    void straightLine();
 
+    void turnLeft();
+
+    void turnRight();
+
+    /***
+     * 微调车姿态
+     */
+    void trimAttitude();
+
+    bool acceptTrackFlag(uint8_t* outTrackFlag, uint32_t* outBitCount, float* outOffset);
+
+    int16_t straightLineSpeed;
+    int16_t turnLeftSpeed;
+    int16_t turnRightSpeed;
+    int16_t straightLineKpSpeed;
+    int16_t trimAttitudeKpSpeed;
+
+    unsigned long trimOutTime_ms;
+    unsigned long outTime_ms;
 };
 
 /***
