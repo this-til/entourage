@@ -252,7 +252,7 @@ void KEY_Handler(uint8_t k_value) {
             k230.setTrackModel(true);
             for (int i = 0; i < 100; ++i) {
                 car.straightLine();
-                car.turnLeft(false);
+                car.turnLeft();
                 car.straightLine();
                 car.turnLeft();
                 car.straightLine();

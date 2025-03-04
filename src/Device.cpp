@@ -767,19 +767,19 @@ void Car::straightLine() {
                             straightLineSpeed + offset > 0 ? -straightLineKpSpeed : straightLineKpSpeed
                     );*/
 
-                    /*DCMotor.SpeedCtr(
+                    DCMotor.SpeedCtr(
                             straightLineSpeed + ((int16_t) (offset * straightLineKpSpeed)),
                             straightLineSpeed - ((int16_t) (offset * straightLineKpSpeed))
-                    );*/
+                    );
 
-                    if (offset == 0) {
+                    /*if (offset == 0) {
                         DCMotor.SpeedCtr(
                                 straightLineSpeed,
                                 straightLineSpeed
                         );
                     } else {
                         trimCar();
-                    }
+                    }*/
 
                 }
             }
@@ -803,6 +803,7 @@ void Car::straightLine() {
                 straightLineSpeed + ((int16_t) (offset * straightLineKpSpeed)),
                 straightLineSpeed - ((int16_t) (offset * straightLineKpSpeed))
         );*/
+/*
 
         if (offset == 0) {
             DCMotor.SpeedCtr(
@@ -812,11 +813,12 @@ void Car::straightLine() {
         } else {
             trimCar();
         }
+*/
 
-        /*DCMotor.SpeedCtr(
+        DCMotor.SpeedCtr(
                 straightLineSpeed + ((int16_t) (offset * straightLineKpSpeed)),
                 straightLineSpeed - ((int16_t) (offset * straightLineKpSpeed))
-        );*/
+        );
     }
     DCMotor.Stop();
 }
