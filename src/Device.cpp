@@ -317,14 +317,15 @@ void Carport::moveToLevel(uint8_t level) {
     send(buf);
 }
 
-uint8_t Carport::getLevel() {
+bool Carport::getLevel(uint8_t * level) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x02, 0x01, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
 
-    if (awaitReturn(buf, 0x01)) {
-        return buf[4];
+    bool successful = awaitReturn(buf, 0x01);
+    if (successful) {
+        *level = buf[4];
     }
-    return 0;
+    return successful;
 }
 
 void Carport::getInfraredState(bool* ventral, bool* rearSide) {

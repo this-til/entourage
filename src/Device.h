@@ -290,9 +290,9 @@ public:
 
     /***
     * 获取车库层数
-    * @return if 0 获取失败
+     * @param level 将层数输出到该指针
     */
-    uint8_t getLevel();
+    bool getLevel(uint8_t * level);
 
     /***
     * 获取车库前后侧红外状态
