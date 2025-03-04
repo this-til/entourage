@@ -460,6 +460,9 @@ def setTrack(open):
 
 # region 二维码
 def qrRecognize(img, outImg=None, sendRecognize=True):
+    global openTrack
+    openTrack = False
+
     if isDebug:
         log("qrRecognize...")
         pass
@@ -575,6 +578,9 @@ TL_YELLOW_RADIUS = [
 
 
 def trafficLightRecognize(img, outImg=None, sendRecognize=True):
+    global openTrack
+    openTrack = False
+
     if isDebug:
         log("trafficLightRecognize...")
         pass
@@ -643,6 +649,9 @@ def trafficLightRecognize(img, outImg=None, sendRecognize=True):
 
 # region PING
 def pinged():
+    global openTrack
+    openTrack = False
+    
     buf = [
         DATA_FRAME_HEADER,
         NATIVE_IDENTIFIER,

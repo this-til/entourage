@@ -429,14 +429,14 @@ public:
  */
     void straightLine();
 
-    void turnLeft();
+    void turnLeft(bool trimCar = true);
 
-    void turnRight();
+    void turnRight(bool trimCar = true);
 
     /***
      * 微调车姿态
      */
-    void trimAttitude();
+    void trimCar();
 
     bool acceptTrackFlag(uint8_t* outTrackFlag, uint32_t* outBitCount, float* outOffset);
 
@@ -448,6 +448,8 @@ public:
 
     unsigned long trimOutTime_ms;
     unsigned long outTime_ms;
+
+
 };
 
 /***

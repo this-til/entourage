@@ -123,12 +123,22 @@ void logObj(K210Color k210Color) {
 
 
 uint32_t countBits(const uint8_t* value, uint32_t len) {
-    uint16_t count = 0;
-    for (int i = 0; i < len; ++i) {
+    uint32_t count = 0;
+    for (uint32_t i = 0; i < len; ++i) {
         for (uint8_t ii = 0; ii < 8; ii++) {
             if (value[i] & (1 << ii)) {
                 count++;
             }
+        }
+    }
+    return count;
+}
+
+uint32_t countBits(const uint8_t* value, uint32_t len, uint32_t starting, uint32_t end) {
+    uint32_t count = 0;
+    for (uint32_t i = starting; i < end; ++i) {
+        if (getBit(value, len, (int32_t) i, true)) {
+            count++;
         }
     }
     return count;
@@ -139,7 +149,7 @@ uint32_t countBits(uint8_t uint8) {
 }
 
 
-uint8_t getBit(uint8_t* value, uint32_t len, int32_t bit, bool fromLeftToRight) {
+uint8_t getBit(const uint8_t* value, uint32_t len, int32_t bit, bool fromLeftToRight) {
     if (bit < 0 || bit >= len * 8) {
         return false;
     }
@@ -177,20 +187,28 @@ void lonelinessExclusion(uint8_t* value, uint32_t len, uint8_t* outValue) {
         outValue[i] = value[i];
     }
 
-
-    for (int32_t i = 0; i < mLen; ++i) {
-        int32_t beforeIn = i - 1;
-        int32_t afterIn = i + 1;
-
-        bool before = getBit(value, len, beforeIn, true);
-        //bool current = (value[i / 8] >> (i % 8)) & 0x01;
-        bool after = getBit(value, len, afterIn, true);
-
-        if (!before && !after) {
-            setBit(outValue, len, i, false, true);
+    bool clearAway = false;
+    for (uint32_t i = mLen / 2; i < mLen; ++i) {
+        if (clearAway) {
+            setBit(outValue, len, (int32_t) i, false, true);
+            continue;
         }
-
+        if (!getBit(value, len, (int32_t) i, true)) {
+            clearAway = true;
+        }
     }
+
+    clearAway = false;
+    for (int32_t i = (int32_t) mLen / 2; i >= 0; --i) {
+        if (clearAway) {
+            setBit(outValue, len, (int32_t) i, false, true);
+            continue;
+        }
+        if (!getBit(value, len, (int32_t) i, true)) {
+            clearAway = true;
+        }
+    }
+
 }
 
 float centralPoint(uint8_t* value, uint32_t len, float* centerShift) {
@@ -221,6 +239,7 @@ float centralPoint(uint8_t* value, uint32_t len, float* centerShift) {
 
     float centralPoint = startingPoint + ((endPoint - startingPoint) / 2);
     centralPoint += 0.5;
-    *centerShift = centralPoint - (float) mLen / 2;
+    float _centerShift = centralPoint - (float) mLen / 2;
+    *centerShift = _centerShift / ((float) mLen / 2 - 0.5f);
     return centralPoint;
 }

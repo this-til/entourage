@@ -246,13 +246,13 @@ void KEY_Handler(uint8_t k_value) {
 
             //k230.setCameraSteeringGearAngle(-55);
             //k230.setTrackModel(true);
-            //car.trimAttitude(60, 10000);
+            //car.trimCar(60, 10000);
             //k230.setTrackModel(false);
             k230.setCameraSteeringGearAngle(-55);
             k230.setTrackModel(true);
             for (int i = 0; i < 100; ++i) {
                 car.straightLine();
-                car.turnLeft();
+                car.turnLeft(false);
                 car.straightLine();
                 car.turnLeft();
                 car.straightLine();
@@ -275,7 +275,7 @@ void KEY_Handler(uint8_t k_value) {
         case 0x03:
             k230.setCameraSteeringGearAngle(-55);
             k230.setTrackModel(true);
-            car.trimAttitude();
+            car.trimCar();
             k230.setTrackModel(false);
 
             break;

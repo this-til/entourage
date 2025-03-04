@@ -14,6 +14,16 @@ void logHex(const uint8_t* p, uint16_t len);
 
 uint32_t countBits(const uint8_t* value, uint32_t len);
 
+/***
+ *
+ * @param value
+ * @param len
+ * @param starting  ~ [starting, end)
+ * @param end       ~
+ * @return
+ */
+uint32_t countBits(const uint8_t* value, uint32_t len, uint32_t starting, uint32_t end);
+
 uint32_t countBits(uint8_t uint8);
 
 /***
@@ -24,7 +34,7 @@ uint32_t countBits(uint8_t uint8);
  * @param fromLeftToRight 从左到右还是从右到左
  * @return
  */
-uint8_t getBit(uint8_t* value, uint32_t len, int32_t bit, bool fromLeftToRight);
+uint8_t getBit(const uint8_t* value, uint32_t len, int32_t bit, bool fromLeftToRight);
 
 void setBit(uint8_t* value, uint32_t len, int32_t bit, bool set, bool fromLeftToRight);
 
@@ -61,7 +71,7 @@ void lonelinessExclusion(uint8_t* value, uint32_t len, uint8_t* outValue);
  * 输出 -1
  * @param value
  * @param len
- * @param centerShift 中心偏移
+ * @param centerShift 中心偏移[-1,1]
  * @return centralPoint
  */
 float centralPoint(uint8_t* value, uint32_t len, float* centerShift);

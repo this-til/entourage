@@ -694,23 +694,27 @@ Car::Car() {
     straightLineSpeed = 20;
     turnLeftSpeed = 40;
     turnRightSpeed = 40;
-    straightLineKpSpeed = 10;
-    trimAttitudeKpSpeed = 10;
+    straightLineKpSpeed = 30;
+    trimAttitudeKpSpeed = 30;
 
     outTime_ms = 10000;
     trimOutTime_ms = 3000;
 }
 
-void Car::turnLeft() {
+void Car::turnLeft(bool trimCar) {
     DCMotor.SpeedCtr(-turnLeftSpeed, turnLeftSpeed);
     sleep(1600);
-    trimAttitude();
+    if (trimCar) {
+        this->trimCar();
+    }
 }
 
-void Car::turnRight() {
+void Car::turnRight(bool trimCar) {
     DCMotor.SpeedCtr(turnRightSpeed, -turnRightSpeed);
     sleep(1600);
-    trimAttitude();
+    if (trimCar) {
+        this->trimCar();
+    }
 }
 
 
@@ -719,7 +723,7 @@ void Car::straightLine() {
     const uint32_t bendThreshold = 5; // 弯道检测阈值（6个以上1）
     unsigned long startTime = millis();
 
-    //trimAttitude();
+    //trimCar();
 
     DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
 
@@ -730,49 +734,90 @@ void Car::straightLine() {
 
         acceptTrackFlag(&trackFlagBit, &bitCount, &offset);
 
-        if (offset == -1) {
+        if (trackFlagBit == 0) {
+            //DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
+            //continue;
+
+            // 考虑进入特殊地形
             DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
-            continue;
+            sleep(300);
+            acceptTrackFlag(&trackFlagBit, &bitCount, &offset);
+            uint8_t centreBitCount = countBits(&trackFlagBit, 1, 2, 6);
+            uint8_t edgeBitCount = bitCount - centreBitCount;
+
+            if (edgeBitCount >= 3) {
+                while (millis() - startTime < outTime_ms) {
+                    acceptTrackFlag(&trackFlagBit, &bitCount, &offset);
+
+                    //离开特殊地形
+                    if (trackFlagBit == 0) {
+                        sleep(300);
+                        acceptTrackFlag(&trackFlagBit, &bitCount, &offset);
+                        break;
+                    }
+
+                    trackFlagBit = ~trackFlagBit;
+                    uint8_t exclusionLonelinessTrackFlagBit = 0;
+                    lonelinessExclusion(&trackFlagBit, 1, &exclusionLonelinessTrackFlagBit);
+                    centralPoint(&exclusionLonelinessTrackFlagBit, 1, &offset);
+
+
+                    /*DCMotor.SpeedCtr(
+                            straightLineSpeed + offset > 0 ? straightLineKpSpeed : -straightLineKpSpeed,
+                            straightLineSpeed + offset > 0 ? -straightLineKpSpeed : straightLineKpSpeed
+                    );*/
+
+                    DCMotor.SpeedCtr(
+                            straightLineSpeed + ((int16_t) (offset * straightLineKpSpeed)),
+                            straightLineSpeed - ((int16_t) (offset * straightLineKpSpeed))
+                    );
+
+                }
+            }
+
         }
 
-        uint8_t edgeBitCount = 0;
-        if (getBit(&trackFlagBit, 1, 0, true)) {
-            edgeBitCount++;
-        }
-        if (getBit(&trackFlagBit, 1, 1, true)) {
-            edgeBitCount++;
-        }
-        if (getBit(&trackFlagBit, 1, 6, true)) {
-            edgeBitCount++;
-        }
-        if (getBit(&trackFlagBit, 1, 7, true)) {
-            edgeBitCount++;
-        }
-
+        uint8_t edgeBitCount = bitCount - countBits(&trackFlagBit, 1, 2, 6);
         if ((edgeBitCount >= 3 || bitCount >= bendThreshold) && millis() - startTime > 500) {
             DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
             sleep((int32_t) (23000 / straightLineSpeed));
-            trimAttitude();
+            trimCar();
             break;
         }
 
+        /*DCMotor.SpeedCtr(
+                straightLineSpeed + offset > 0 ? straightLineKpSpeed : -straightLineKpSpeed,
+                straightLineSpeed + offset > 0 ? -straightLineKpSpeed : straightLineKpSpeed
+        );*/
+
+        /*DCMotor.SpeedCtr(
+                straightLineSpeed + ((int16_t) (offset * straightLineKpSpeed)),
+                straightLineSpeed - ((int16_t) (offset * straightLineKpSpeed))
+        );*/
+
+        /* if (offset == 0) {
+             DCMotor.SpeedCtr(
+                     straightLineSpeed,
+                     straightLineSpeed
+             );
+         } else {
+             trimCar();
+         }*/
+
         DCMotor.SpeedCtr(
-                straightLineSpeed + (offset > 0 ? straightLineKpSpeed : -straightLineKpSpeed),
-                straightLineSpeed + (offset > 0 ? -straightLineKpSpeed : straightLineKpSpeed)
+                straightLineSpeed + ((int16_t) (offset * straightLineKpSpeed)),
+                straightLineSpeed - ((int16_t) (offset * straightLineKpSpeed))
         );
     }
     DCMotor.Stop();
 }
 
-void Car::trimAttitude() {
+void Car::trimCar() {
     unsigned long startTime = millis();
     while (millis() - startTime < trimOutTime_ms) {
         uint8_t trackFlagBit;
         float offset = 0;
         acceptTrackFlag(&trackFlagBit, nullptr, &offset);
-        if (offset == -1) {
-            continue;
-        }
         if (offset == 0) {
             /*DCMotor.Stop();
             unsigned long toBendTime = millis();
@@ -786,7 +831,13 @@ void Car::trimAttitude() {
             }*/
             break;
         }
-        DCMotor.SpeedCtr(offset > 0 ? trimAttitudeKpSpeed : -trimAttitudeKpSpeed, offset > 0 ? -trimAttitudeKpSpeed : trimAttitudeKpSpeed);
+        //DCMotor.SpeedCtr(offset > 0 ? trimAttitudeKpSpeed : -trimAttitudeKpSpeed, offset > 0 ? -trimAttitudeKpSpeed : trimAttitudeKpSpeed);
+
+        DCMotor.SpeedCtr(
+                ((int16_t) (offset * straightLineKpSpeed)),
+                -((int16_t) (offset * straightLineKpSpeed))
+        );
+
     }
 
     DCMotor.Stop();
