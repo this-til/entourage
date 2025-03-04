@@ -225,6 +225,9 @@ bool BusStop::getRtcDate(uint8_t* yy, uint8_t* MM, uint8_t* dd) {
 }
 
 bool BusStop::getRtcTime(uint8_t* HH, uint8_t* mm, uint8_t* ss) {
+#if DE_BUG
+    Serial.println("[DEBUG] getRtcTime...");
+#endif
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x41, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
     bool successful = awaitReturn(buf, 0x03);
@@ -232,6 +235,16 @@ bool BusStop::getRtcTime(uint8_t* HH, uint8_t* mm, uint8_t* ss) {
         *HH = buf[3];
         *mm = buf[4];
         *ss = buf[5];
+
+#if DE_BUG
+        Serial.print("HH:");
+        Serial.print(*HH);
+        Serial.print("  mm:");
+        Serial.print(*mm);
+        Serial.print("  ss:");
+        Serial.println(*ss);
+#endif
+
     }
     return successful;
 }
@@ -300,6 +313,11 @@ void Monitor::setDisplayData(uint8_t pos, const uint8_t value[]) {
 }
 
 void Monitor::setTimingMode(TimingMode timingMode) {
+#if DE_BUG
+    Serial.print("[DEBUG] setTimingMode:");
+    logObj(timingMode);
+    Serial.println();
+#endif
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x03, (uint8_t) timingMode, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
 }
@@ -317,7 +335,7 @@ void Carport::moveToLevel(uint8_t level) {
     send(buf);
 }
 
-bool Carport::getLevel(uint8_t * level) {
+bool Carport::getLevel(uint8_t* level) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x02, 0x01, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
 
