@@ -314,10 +314,16 @@ openTrack = False
 # IMG_WIDTH = 240
 # IMG_HEIGHT = 320
 
-trackFlagBit = 0
+trackFlagBitHigh = 0
+trackFlagBitLow = 1
 
-# 定义一个列表 rectangles，包含8个元组，每个元组表示一个矩形的左上角坐标 (x, y)。
-RECTANGLES = [(160, 5), (160, 35), (160, 65), (160, 95), (160, 125), (160, 155), (160, 185), (160, 215)]
+# 高位区域数组，位于图像上侧
+HIGH_RECTANGLES = [(260, 5), (260, 35), (260, 65), (260, 95), (260, 125), (260, 155), (260, 185), (260, 215)]
+# 低位区域数组，位于图像下侧
+LOW_RECTANGLES = [(60, 5), (60, 35), (60, 65), (60, 95), (60, 125), (60, 155), (60, 185), (60, 215)]
+
+RECTANGLES = HIGH_RECTANGLES + LOW_RECTANGLES
+
 LINE_COLOR_THRESHOLD = [(0, 45)]
 
 
@@ -326,39 +332,62 @@ def initTrack():
 
 
 def track(img, outImg=None, sendRecognize=False):
-    global trackFlagBit
-    _rackFlagBit = 0
-
-    for x, y in RECTANGLES:
-        img.draw_rectangle(x, y, 20, 20, color=(0, 255, 0), thickness=2, fill=False)
+    global trackFlagBitHigh, trackFlagBitLow
+    trackFlagBitHigh = 0
+    trackFlagBitLow = 0
 
     for i, (x, y) in enumerate(RECTANGLES):
         w, h = 20, 20
-        # 定义矩形的宽度和高度为 20 像素。
-
-        # Perform color thresholding in the region of interest (ROI)
-        # 在感兴趣区域 (ROI) 内进行颜色阈值检测。
         blobs = img.find_blobs(LINE_COLOR_THRESHOLD, roi=(x, y, w, h))
-
-        # Check if any blob's area is greater than 100
-        # 检查是否有任意一个色块的面积大于 100。
         for blob in blobs:
             if blob.area() > 100:
-                outImg.draw_rectangle(x, y, 20, 20, color=(0, 255, 0), thickness=2, fill=True)
-                outImg.draw_string(x, y, str(i))
+                if outImg is not None:
+                    outImg.draw_rectangle(x, y, 20, 20, color=(0, 255, 0), thickness=2, fill=True)
+                    outImg.draw_string(x, y, str(i))
 
-                _rackFlagBit |= 1 << (7 - i)
-                # why 为啥不是  _rackFlagBit |= 1 << i
-                # 请渡学长的遗物
-                # bools = [False] * 8
-                # .....
-                # bools[i] = True
-                # .....
-                # binary_str = ''.join(['1' if b else '0' for b in bools])
-                # hex_value = int(binary_str, 2)
+                if i < 8:
+                    trackFlagBitHigh |= 1 << (7 - i)
+                else:
+                    trackFlagBitLow |= 1 << (7 - (i - 8))
+
                 break
+        pass
 
-    trackFlagBit = _rackFlagBit
+    # 高位判断
+    #for i, (x, y) in enumerate(HIGH_RECTANGLES):
+    #    w, h = 20, 20
+    #    blobs = img.find_blobs(LINE_COLOR_THRESHOLD, roi=(x, y, w, h))
+    #    # 检查是否有任意一个色块的阈值大于 100。高位判断
+    #    for blob in blobs:
+    #        if blob.area() > 100:
+    #            if outImg is not None:
+    #                outImg.draw_rectangle(x, y, 20, 20, color=(0, 255, 0), thickness=2, fill=True)
+    #                outImg.draw_string(x, y, str(i))
+    #            _rackFlagBit_high |= 1 << (7 - i)
+    #            break
+    #            # why 为啥不是  _rackFlagBit |= 1 << i
+    #            # no why
+    #            # 请渡学长的遗物
+    #            # bools = [False] * 8
+    #            # .....
+    #            # bools[i] = True
+    #            # .....
+    #            # binary_str = ''.join(['1' if b else '0' for b in bools])
+    #            # hex_value = int(binary_str, 2)
+    ## 低位判断
+    #for i, (x, y) in enumerate(LOW_RECTANGLES):
+    #    w, h = 20, 20
+    #    # 低位检测使用不同的ROI，向下偏移一定距离
+    #    roi_low = (x, y, w, h)
+    #    blobs = img.find_blobs(LINE_COLOR_THRESHOLD, roi=roi_low)
+    #    for blob in blobs:
+    #        if blob.area() > 100:
+    #            if outImg is not None:
+    #                # 为了与绘制的矩形保持一致，这里也可以选择绘制在 roi_low 位置
+    #                outImg.draw_rectangle(x, y, 20, 20, color=(0, 255, 0), thickness=2, fill=True)
+    #                outImg.draw_string(x - 200, y, str(i))
+    #            _rackFlagBit_low |= 1 << (7 - i)
+    #            break
 
     if sendRecognize:
         sendTrack(None)
@@ -372,8 +401,8 @@ def sendTrack(e):
         NATIVE_IDENTIFIER,
         0x91,
         0x01,
-        trackFlagBit,
-        0x00,
+        trackFlagBitHigh,
+        trackFlagBitLow,
         0x00,
         DATA_FRAME_TAIL
     ])
@@ -381,10 +410,13 @@ def sendTrack(e):
 
 def setTrack(open):
     global openTrack
+    global trackFlagBitLow
+    global trackFlagBitHigh
     if isDebug:
         log("setTrack:" + str(open))
     openTrack = open
-    trackFlagBit = 0
+    trackFlagBitHigh = 0
+    trackFlagBitLow = 0
     pass
 
 
@@ -651,7 +683,7 @@ def trafficLightRecognize(img, outImg=None, sendRecognize=True):
 def pinged():
     global openTrack
     openTrack = False
-    
+
     buf = [
         DATA_FRAME_HEADER,
         NATIVE_IDENTIFIER,
