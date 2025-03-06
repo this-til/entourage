@@ -2,15 +2,18 @@
 // Created by til on 2025/3/1.
 //
 
+
 #ifndef ENTOURAGE_CLION_UTIL_H
 #define ENTOURAGE_CLION_UTIL_H
 
 #include "def.h"
 
+#define tristate(v, min, z, max) v > 0 ? max : v < 0 ? min : z
+#define inRand(v, min, max) v >= min && v <= max
+
 void logHex(uint8_t p);
 
 void logHex(const uint8_t* p, uint16_t len);
-
 
 uint32_t countBits(const uint8_t* value, uint32_t len);
 
@@ -75,7 +78,7 @@ void lonelinessExclusion(uint8_t* value, uint32_t len, uint8_t* outValue);
  * @param centerShift 中心偏移[-1,1]
  * @return centralPoint
  */
-float centralPoint(uint8_t* value, uint32_t len, float  *centerShift,float* centerShiftOne);
+float centralPoint(uint8_t* value, uint32_t len, float* centerShift, float* centerShiftOne);
 
 
 #endif //ENTOURAGE_CLION_UTIL_H

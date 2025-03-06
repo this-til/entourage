@@ -87,13 +87,13 @@ class DeviceBase {
 public:
     explicit DeviceBase(uint8_t id);
 
-    void send(uint8_t *buf);
+    void send(uint8_t* buf);
 
-    bool check(const uint8_t *buf, const uint8_t *serviceId, uint8_t serviceLen);
+    bool check(const uint8_t* buf, const uint8_t* serviceId, uint8_t serviceLen);
 
-    bool awaitReturn(uint8_t buf[], const uint8_t *serviceId, uint8_t serviceLen);
+    bool awaitReturn(uint8_t buf[], const uint8_t* serviceId, uint8_t serviceLen);
 
-    bool check(const uint8_t *buf, uint8_t serviceId);
+    bool check(const uint8_t* buf, uint8_t serviceId);
 
     bool awaitReturn(uint8_t buf[], uint8_t serviceId);
 
@@ -124,7 +124,7 @@ public:
     /***
      * 使用红外线开启报警台，默认开启码是6位
      */
-    void openByInfrared(uint8_t *openCode);
+    void openByInfrared(uint8_t* openCode);
 
     /***
      * 获取救援位置
@@ -205,12 +205,12 @@ public:
     /***
     * 查询RTC当前日期
     */
-    bool getRtcDate(uint8_t *yy, uint8_t *MM, uint8_t *dd);
+    bool getRtcDate(uint8_t* yy, uint8_t* MM, uint8_t* dd);
 
     /***
      * 查询RTC当前时间
      */
-    bool getRtcTime(uint8_t *HH, uint8_t *mm, uint8_t *ss);
+    bool getRtcTime(uint8_t* HH, uint8_t* mm, uint8_t* ss);
 
     /***
      * 设置天气数据与温度数据
@@ -220,12 +220,12 @@ public:
     /***
      * 请求回传天气数据与温度数据
      */
-    bool getWeatherTemperature(Weather *weather, uint8_t *temperature);
+    bool getWeatherTemperature(Weather* weather, uint8_t* temperature);
 
     /***
      * 开始合成语言
      */
-    void startSynthesizingLanguage(const uint8_t *data, uint16_t len, TextEncodingFormat textEncodingFormat);
+    void startSynthesizingLanguage(const uint8_t* data, uint16_t len, TextEncodingFormat textEncodingFormat);
 
     /***
      * 停止合成语音
@@ -292,14 +292,14 @@ public:
     * 获取车库层数
      * @param level 将层数输出到该指针
     */
-    bool getLevel(uint8_t *level);
+    bool getLevel(uint8_t* level);
 
     /***
     * 获取车库前后侧红外状态
     * @param ventral out 前侧
     * @param rearSide out 后侧
     */
-    void getInfraredState(bool *ventral, bool *rearSide);
+    void getInfraredState(bool* ventral, bool* rearSide);
 
 
 };
@@ -348,7 +348,7 @@ struct QrMessage {
     /***
      * 二维码信息容器
      */
-    uint8_t *message;
+    uint8_t* message;
 
     uint8_t messageMaxLen = 0;
 
@@ -378,7 +378,7 @@ public:
      * 该函数需要开启寻迹
      * @return
      */
-    bool getTrackFlagBit(uint8_t *trackFlagBitHigh, uint8_t *trackFlagBitLow);
+    bool getTrackFlagBit(uint8_t* trackFlagBitHigh, uint8_t* trackFlagBitLow);
 
     /***
      *
@@ -386,13 +386,13 @@ public:
      * @param qrMessageArray
      * @param len
      */
-    bool qrRecognize(uint8_t *count, QrMessage *qrMessageArray, uint8_t maxLen);
+    bool qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen);
 
     /***
      * 检测红绿灯
      * @param color
      */
-    bool trafficLightRecognize(K210Color *k210Color);
+    bool trafficLightRecognize(K210Color* k210Color);
 
     /***
      * 多从重复以获取精准的值
@@ -401,7 +401,7 @@ public:
      * @param maxRetry 最大重试次数
      * @return
      */
-    bool trafficLightRecognize_rigorous(K210Color *k210Color, uint16_t consecutiveEqualDegree = 3, uint16_t maxRetry = 48);
+    bool trafficLightRecognize_rigorous(K210Color* k210Color, uint16_t consecutiveEqualDegree = 3, uint16_t maxRetry = 48);
 
     /***
      * 测试连接用的
@@ -420,12 +420,12 @@ struct TrackResult {
     uint8_t trackFlagLow;
     float highOffset;
     float lowOffset;
-    uint32_t highBitCount;
-    uint32_t lowBitCount;
-    uint32_t highCenterBitCount;
-    uint32_t lowCenterBitCount;
-    uint32_t highEdgeBitCount;
-    uint32_t lowEdgeBitCount;
+    uint8_t highBitCount;
+    uint8_t lowBitCount;
+    uint8_t highCenterBitCount;
+    uint8_t lowCenterBitCount;
+    uint8_t highEdgeBitCount;
+    uint8_t lowEdgeBitCount;
 };
 
 /***
@@ -436,11 +436,39 @@ class Car {
 public:
     Car();
 
+    /***
+     * 清除车的码盘值
+     */
+    void clearCodeDisc();
+
+    /***
+     * 获取车的码盘值
+     * @return
+     */
+    uint16_t getCodeDisc();
+
+    /***
+     * 获取寻迹灯
+     */
+    uint16_t getTrackLamp();
+
 /***
  * 直行到下一个路口
  * @param carSpeed
  */
     void straightLine();
+
+    /***
+     * 前进一段距离
+     * 无寻迹
+     */
+    void advance(uint16_t distance);
+
+/***
+ * 后退一定距离
+ * 无寻迹
+ */
+    void recoil(uint16_t distance);
 
     void turnLeft(bool trimCar = true);
 
@@ -451,27 +479,36 @@ public:
      */
     void trimCar();
 
-    bool acceptTrackFlag(TrackResult *trackResult);
+    bool acceptTrackFlag();
 
     int16_t straightLineSpeed;
     int16_t turnLeftSpeed;
     int16_t turnRightSpeed;
     int16_t straightLineKpSpeed;
-    int16_t trimAttitudeKpSpeed;
+    int16_t trimKpSpeed;
 
     // PID 控制参数（车体校正时用的）——作为类成员便于调试和参数调整
-    float _trimAttitudeKpSpeed;  // 比例系数
-    float _trimAttitudeKiSpeed;  // 积分系数
-    float _trimAttitudeKdSpeed;  // 微分系数
+    float _trimAttitudeKpSpeed{};  // 比例系数
+    float _trimAttitudeKiSpeed{};  // 积分系数
+    float _trimAttitudeKdSpeed{};  // 微分系数
 
     unsigned long trimOutTime_ms;
     unsigned long outTime_ms;
 
 private:
     // PID 状态变量：用于跨循环累积（每次 trimCar 调用开始时会重置）
-    float pid_integral;
-    float lastError;
+    float pid_integral{};
+    float lastError{};
 
+    TrackResult trackResult{};
+
+    void rotationProcess();
+
+    /***
+     * 等待码盘
+     * @param 等待码盘的变化量达到指定值(不检测正反)
+     */
+    void waitCodeDisc(uint16_t distance);
 };
 
 /***

@@ -146,7 +146,7 @@ void l_setup() {
 
     mySCoop.start();
 
-    Serial.print("init end");
+    Serial.println("init end");
 
 }
 
@@ -169,6 +169,7 @@ void TaskMain::setup() {
 
 void TaskMain::loop() {
 
+    CoreKEY.Kwhile(KEY_Handler);
 
     //k230.loop();
 
@@ -199,7 +200,6 @@ void TaskCar::setup() {
 }
 
 void TaskCar::loop() {
-    CoreKEY.Kwhile(KEY_Handler);
 
     /*if (k230.ping()) {
         carLight.RightTurnOn();
@@ -218,11 +218,6 @@ void KEY_Handler(uint8_t k_value) {
     logHex(k_value);
     Serial.println();
 #endif
-
-    K210Color k210Color;
-    uint8_t count;
-
-    float carSpeed = 20;
 
     switch (k_value) {
         case 0x01:
@@ -252,7 +247,11 @@ void KEY_Handler(uint8_t k_value) {
             k230.setTrackModel(true);
             for (int i = 0; i < 100; ++i) {
                 car.straightLine();
-                car.turnLeft();
+
+                car.turnLeft(false);
+                car.recoil(300);
+                car.trimCar();
+
                 car.straightLine();
                 car.turnLeft();
                 car.straightLine();
@@ -280,30 +279,11 @@ void KEY_Handler(uint8_t k_value) {
 
             break;
         case 0x04:
-            /*k230.setCameraSteeringGearAngle(-55);
-            k230.setTrackModel(true);
-            car.turnRight();
-            k230.setTrackModel(false);*/
-            unsigned long startTime = millis();
-            k230.setTrackModel(true);
-            while (millis() - startTime < 100000) {
-                uint8_t trackFlagBit;
-                if (!k230.getTrackFlagBit(&trackFlagBit)) {
-                    continue;
-                }
-                float offset = 0;
-                centralPoint(&trackFlagBit, 1, &offset);
+            /* car.getCodeDisc();
+             car.clearCodeDisc();
+             car.getCodeDisc();*/
 
-                Serial.print("[DEBUG] offset:");
-                Serial.print(offset);
-                Serial.println();
-
-/*#if DE_BUG
-
-#endif*/
-            }
-            k230.setTrackModel(false);
-
+            car.recoil(100);
             break;
     }
 }

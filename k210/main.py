@@ -1,10 +1,7 @@
-import binascii
 import gc
-import _thread
 
 import lcd
 import sensor
-import time
 from Maix import GPIO
 from fpioa_manager import fm
 from machine import PWM, UART, Timer
@@ -314,8 +311,8 @@ openTrack = False
 # IMG_WIDTH = 240
 # IMG_HEIGHT = 320
 
-trackFlagBitHigh = 0
-trackFlagBitLow = 1
+trackFlagBitHigh
+trackFlagBitLow
 
 # 高位区域数组，位于图像上侧
 HIGH_RECTANGLES = [(260, 5), (260, 35), (260, 65), (260, 95), (260, 125), (260, 155), (260, 185), (260, 215)]
@@ -354,7 +351,7 @@ def track(img, outImg=None, sendRecognize=False):
         pass
 
     # 高位判断
-    #for i, (x, y) in enumerate(HIGH_RECTANGLES):
+    # for i, (x, y) in enumerate(HIGH_RECTANGLES):
     #    w, h = 20, 20
     #    blobs = img.find_blobs(LINE_COLOR_THRESHOLD, roi=(x, y, w, h))
     #    # 检查是否有任意一个色块的阈值大于 100。高位判断
@@ -375,7 +372,7 @@ def track(img, outImg=None, sendRecognize=False):
     #            # binary_str = ''.join(['1' if b else '0' for b in bools])
     #            # hex_value = int(binary_str, 2)
     ## 低位判断
-    #for i, (x, y) in enumerate(LOW_RECTANGLES):
+    # for i, (x, y) in enumerate(LOW_RECTANGLES):
     #    w, h = 20, 20
     #    # 低位检测使用不同的ROI，向下偏移一定距离
     #    roi_low = (x, y, w, h)
@@ -762,7 +759,7 @@ if __name__ == '__main__':
             if openTrack:
                 track(primitiveImg, img, True)
 
-            #drawLogs(img)
+            drawLogs(img)
 
             lcd.display(img)
         except Exception as err:
