@@ -11,7 +11,7 @@ void logHex(uint8_t p) {
     Serial.print(hex_chars[p & 0x0F]);
 }
 
-void logHex(const uint8_t* p, uint16_t len) {
+void logHex(const uint8_t *p, uint16_t len) {
     for (uint16_t i = 0; i < len; ++i) {
         logHex(p[i]);
     }
@@ -122,7 +122,7 @@ void logObj(K210Color k210Color) {
 }
 
 
-uint32_t countBits(const uint8_t* value, uint32_t len) {
+uint32_t countBits(const uint8_t *value, uint32_t len) {
     uint32_t count = 0;
     for (uint32_t i = 0; i < len; ++i) {
         for (uint8_t ii = 0; ii < 8; ii++) {
@@ -134,7 +134,7 @@ uint32_t countBits(const uint8_t* value, uint32_t len) {
     return count;
 }
 
-uint32_t countBits(const uint8_t* value, uint32_t len, uint32_t starting, uint32_t end) {
+uint32_t countBits(const uint8_t *value, uint32_t len, uint32_t starting, uint32_t end) {
     uint32_t count = 0;
     for (uint32_t i = starting; i < end; ++i) {
         if (getBit(value, len, (int32_t) i, true)) {
@@ -149,7 +149,7 @@ uint32_t countBits(uint8_t uint8) {
 }
 
 
-uint8_t getBit(const uint8_t* value, uint32_t len, int32_t bit, bool fromLeftToRight) {
+uint8_t getBit(const uint8_t *value, uint32_t len, int32_t bit, bool fromLeftToRight) {
     if (bit < 0 || bit >= len * 8) {
         return false;
     }
@@ -161,7 +161,7 @@ uint8_t getBit(const uint8_t* value, uint32_t len, int32_t bit, bool fromLeftToR
     }
 }
 
-void setBit(uint8_t* value, uint32_t len, int32_t bit, bool set, bool fromLeftToRight) {
+void setBit(uint8_t *value, uint32_t len, int32_t bit, bool set, bool fromLeftToRight) {
     if (bit < 0 || bit >= len * 8) {
         return;
     }
@@ -180,7 +180,7 @@ void setBit(uint8_t* value, uint32_t len, int32_t bit, bool set, bool fromLeftTo
     }
 }
 
-void lonelinessExclusion(uint8_t* value, uint32_t len, uint8_t* outValue) {
+void lonelinessExclusion(uint8_t *value, uint32_t len, uint8_t *outValue) {
     uint32_t mLen = len * 8;
 
     for (uint32_t i = 0; i < len; ++i) {
@@ -211,7 +211,7 @@ void lonelinessExclusion(uint8_t* value, uint32_t len, uint8_t* outValue) {
 
 }
 
-float centralPoint(uint8_t* value, uint32_t len, float* centerShift) {
+float centralPoint(uint8_t *value, uint32_t len, float *centerShift, float *centerShiftOne) {
     uint32_t mLen = len * 8;
     float startingPoint = -1;
     float endPoint = -1;
@@ -225,7 +225,12 @@ float centralPoint(uint8_t* value, uint32_t len, float* centerShift) {
     }
 
     if (startingPoint == -1) {
-        *centerShift = 0;
+        if (centerShift != nullptr) {
+            *centerShift = 0;
+        }
+        if (centerShiftOne != nullptr) {
+            *centerShiftOne = 0;
+        }
         return -1;
     }
 
@@ -240,6 +245,11 @@ float centralPoint(uint8_t* value, uint32_t len, float* centerShift) {
     float centralPoint = startingPoint + ((endPoint - startingPoint) / 2);
     centralPoint += 0.5;
     float _centerShift = centralPoint - (float) mLen / 2;
-    *centerShift = _centerShift / ((float) mLen / 2 - 0.5f);
+    if (centerShift != nullptr) {
+        *centerShift = _centerShift;
+    }
+    if (centerShiftOne != nullptr) {
+        *centerShiftOne = _centerShift / ((float) mLen / 2 - 0.5f);
+    }
     return centralPoint;
 }

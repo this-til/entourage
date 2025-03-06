@@ -64,17 +64,18 @@ void lonelinessExclusion(uint8_t* value, uint32_t len, uint8_t* outValue);
  * 输入 00011000
  * 输出 4
  *
- * 输入 00001000
- * 输出 4.5
+ * 输入 00001110
+ * 输出 5.5
  *
  * 输入 00000000
  * 输出 -1
  * @param value
  * @param len
+ * @param centerShift 中心偏移
  * @param centerShift 中心偏移[-1,1]
  * @return centralPoint
  */
-float centralPoint(uint8_t* value, uint32_t len, float* centerShift);
+float centralPoint(uint8_t* value, uint32_t len, float  *centerShift,float* centerShiftOne);
 
 
 #endif //ENTOURAGE_CLION_UTIL_H
