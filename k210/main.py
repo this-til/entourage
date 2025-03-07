@@ -1,10 +1,7 @@
-import binascii
 import gc
-import _thread
 
 import lcd
 import sensor
-import time
 from Maix import GPIO
 from fpioa_manager import fm
 from machine import PWM, UART, Timer
@@ -314,27 +311,44 @@ openTrack = False
 # IMG_WIDTH = 240
 # IMG_HEIGHT = 320
 
-trackFlagBitHigh = 0
-trackFlagBitLow = 1
+trackFlagBit = 0
+
+# trackFlagBitHigh = 0
+# trackFlagBitLow = 0
 
 # 高位区域数组，位于图像上侧
-HIGH_RECTANGLES = [(260, 5), (260, 35), (260, 65), (260, 95), (260, 125), (260, 155), (260, 185), (260, 215)]
+# HIGH_RECTANGLES = [(260, 5), (260, 35), (260, 65), (260, 95), (260, 125), (260, 155), (260, 185), (260, 215)]
 # 低位区域数组，位于图像下侧
-LOW_RECTANGLES = [(60, 5), (60, 35), (60, 65), (60, 95), (60, 125), (60, 155), (60, 185), (60, 215)]
+# LOW_RECTANGLES_ROTATIONAL_TIME = [(160, 5), (160, 35), (160, 65), (160, 95), (160, 125), (160, 155), (160, 185), (160, 215)]
+# LOW_RECTANGLES = [(60, 5), (60, 35), (60, 65), (60, 95), (60, 125), (60, 155), (60, 185), (60, 215)]
 
-RECTANGLES = HIGH_RECTANGLES + LOW_RECTANGLES
+RECTANGLES = []
+
+# RECTANGLES = HIGH_RECTANGLES + LOW_RECTANGLES
+# RECTANGLES_ROTATIONAL_TIME = HIGH_RECTANGLES + LOW_RECTANGLES_ROTATIONAL_TIME
 
 LINE_COLOR_THRESHOLD = [(0, 45)]
 
 
 def initTrack():
+    # 224
+    # 16
+
+    for i in range(0, 16):
+        y = 8 + i * 14
+        RECTANGLES.append((160, y))
+        pass
+
     pass
 
 
 def track(img, outImg=None, sendRecognize=False):
-    global trackFlagBitHigh, trackFlagBitLow
-    trackFlagBitHigh = 0
-    trackFlagBitLow = 0
+    # global trackFlagBitHigh, trackFlagBitLow
+    # trackFlagBitHigh = 0
+    # trackFlagBitLow = 0
+
+    global trackFlagBit
+    trackFlagBit = 0
 
     for i, (x, y) in enumerate(RECTANGLES):
         w, h = 20, 20
@@ -345,16 +359,13 @@ def track(img, outImg=None, sendRecognize=False):
                     outImg.draw_rectangle(x, y, 20, 20, color=(0, 255, 0), thickness=2, fill=True)
                     outImg.draw_string(x, y, str(i))
 
-                if i < 8:
-                    trackFlagBitHigh |= 1 << (7 - i)
-                else:
-                    trackFlagBitLow |= 1 << (7 - (i - 8))
+                trackFlagBit |= 1 << (16 - i)
 
                 break
         pass
 
     # 高位判断
-    #for i, (x, y) in enumerate(HIGH_RECTANGLES):
+    # for i, (x, y) in enumerate(HIGH_RECTANGLES):
     #    w, h = 20, 20
     #    blobs = img.find_blobs(LINE_COLOR_THRESHOLD, roi=(x, y, w, h))
     #    # 检查是否有任意一个色块的阈值大于 100。高位判断
@@ -375,7 +386,7 @@ def track(img, outImg=None, sendRecognize=False):
     #            # binary_str = ''.join(['1' if b else '0' for b in bools])
     #            # hex_value = int(binary_str, 2)
     ## 低位判断
-    #for i, (x, y) in enumerate(LOW_RECTANGLES):
+    # for i, (x, y) in enumerate(LOW_RECTANGLES):
     #    w, h = 20, 20
     #    # 低位检测使用不同的ROI，向下偏移一定距离
     #    roi_low = (x, y, w, h)
@@ -401,8 +412,8 @@ def sendTrack(e):
         NATIVE_IDENTIFIER,
         0x91,
         0x01,
-        trackFlagBitHigh,
-        trackFlagBitLow,
+        (trackFlagBit >> 8) & 0xFF,
+        trackFlagBit & 0xFF,
         0x00,
         DATA_FRAME_TAIL
     ])
@@ -410,13 +421,9 @@ def sendTrack(e):
 
 def setTrack(open):
     global openTrack
-    global trackFlagBitLow
-    global trackFlagBitHigh
     if isDebug:
         log("setTrack:" + str(open))
     openTrack = open
-    trackFlagBitHigh = 0
-    trackFlagBitLow = 0
     pass
 
 
@@ -762,7 +769,7 @@ if __name__ == '__main__':
             if openTrack:
                 track(primitiveImg, img, True)
 
-            #drawLogs(img)
+            drawLogs(img)
 
             lcd.display(img)
         except Exception as err:

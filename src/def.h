@@ -14,7 +14,6 @@
 #define LOG_DEBUG  (LOG_LEVEL >= 4)
 */
 
-
 #ifndef ENTOURAGE_CLION_DEF_H
 #define ENTOURAGE_CLION_DEF_H
 

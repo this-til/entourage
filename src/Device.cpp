@@ -21,7 +21,7 @@ DeviceBase::DeviceBase(uint8_t id) {
     this->debug = true;
 }
 
-void DeviceBase::send(uint8_t *buf) {
+void DeviceBase::send(uint8_t* buf) {
     if (sendVerify) {
         uint32_t com = 0;
         for (uint8_t i = 2; i < sendLen - 2; i++) {
@@ -41,7 +41,7 @@ void DeviceBase::send(uint8_t *buf) {
     }
 }
 
-bool DeviceBase::check(const uint8_t *buf, const uint8_t *serviceId, uint8_t serviceLen) {
+bool DeviceBase::check(const uint8_t* buf, const uint8_t* serviceId, uint8_t serviceLen) {
     if (buf[0] != DATA_FRAME_HEADER) {
 #if DE_BUG
         Serial.print("  inaccuracy header:");
@@ -104,7 +104,7 @@ bool DeviceBase::check(const uint8_t *buf, const uint8_t *serviceId, uint8_t ser
 }
 
 
-bool DeviceBase::awaitReturn(uint8_t *buf, const uint8_t *serviceId, uint8_t serviceLen) {
+bool DeviceBase::awaitReturn(uint8_t* buf, const uint8_t* serviceId, uint8_t serviceLen) {
     unsigned long startTime = millis();
 
 #if DE_BUG
@@ -129,11 +129,11 @@ bool DeviceBase::awaitReturn(uint8_t *buf, const uint8_t *serviceId, uint8_t ser
     return false;
 }
 
-bool DeviceBase::check(const uint8_t *buf, uint8_t serviceId) {
+bool DeviceBase::check(const uint8_t* buf, uint8_t serviceId) {
     return check(buf, &serviceId, 1);
 }
 
-bool DeviceBase::awaitReturn(uint8_t *buf, uint8_t serviceId) {
+bool DeviceBase::awaitReturn(uint8_t* buf, uint8_t serviceId) {
     return awaitReturn(buf, &serviceId, 1);
 }
 
@@ -141,7 +141,7 @@ bool DeviceBase::awaitReturn(uint8_t *buf, uint8_t serviceId) {
 AlarmDesk::AlarmDesk(uint8_t id) : DeviceBase(id) {
 }
 
-void AlarmDesk::openByInfrared(uint8_t *openCode) {
+void AlarmDesk::openByInfrared(uint8_t* openCode) {
     Infrare.Transmition(openCode, 6);
 }
 
@@ -213,7 +213,7 @@ void BusStop::setRtcStartTime(uint8_t HH, uint8_t mm, uint8_t ss) {
     send(buf);
 }
 
-bool BusStop::getRtcDate(uint8_t *yy, uint8_t *MM, uint8_t *dd) {
+bool BusStop::getRtcDate(uint8_t* yy, uint8_t* MM, uint8_t* dd) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x31, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
     bool successful = awaitReturn(buf, 0x02);
@@ -225,7 +225,7 @@ bool BusStop::getRtcDate(uint8_t *yy, uint8_t *MM, uint8_t *dd) {
     return successful;
 }
 
-bool BusStop::getRtcTime(uint8_t *HH, uint8_t *mm, uint8_t *ss) {
+bool BusStop::getRtcTime(uint8_t* HH, uint8_t* mm, uint8_t* ss) {
 #if DE_BUG
     Serial.println("[DEBUG] getRtcTime...");
 #endif
@@ -255,7 +255,7 @@ void BusStop::setWeatherTemperature(Weather weather, uint8_t temperature) {
     send(buf);
 }
 
-bool BusStop::getWeatherTemperature(Weather *weather, uint8_t *temperature) {
+bool BusStop::getWeatherTemperature(Weather* weather, uint8_t* temperature) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x43, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
     bool successful = awaitReturn(buf, 0x04);
@@ -266,10 +266,10 @@ bool BusStop::getWeatherTemperature(Weather *weather, uint8_t *temperature) {
     return successful;
 }
 
-void BusStop::startSynthesizingLanguage(const uint8_t *data, uint16_t len, TextEncodingFormat textEncodingFormat) {
+void BusStop::startSynthesizingLanguage(const uint8_t* data, uint16_t len, TextEncodingFormat textEncodingFormat) {
     uint16_t size = 5 + len;
     uint16_t dataSize = len + 1;
-    auto *buf = new uint8_t[size];
+    auto* buf = new uint8_t[size];
 
     buf[0] = 0xFD;
 
@@ -337,7 +337,7 @@ void Carport::moveToLevel(uint8_t level) {
     send(buf);
 }
 
-bool Carport::getLevel(uint8_t *level) {
+bool Carport::getLevel(uint8_t* level) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x02, 0x01, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
 
@@ -348,7 +348,7 @@ bool Carport::getLevel(uint8_t *level) {
     return successful;
 }
 
-void Carport::getInfraredState(bool *ventral, bool *rearSide) {
+void Carport::getInfraredState(bool* ventral, bool* rearSide) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x02, 0x02, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
 
@@ -381,16 +381,22 @@ K230::K230(uint8_t id) : DeviceBase(id) {
 }
 
 void K230::setTrackModel(bool open) {
-    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x91, 0x01, open ? (uint8_t) 0x01 : (uint8_t) 0x02, 0x00, 0x00,
-                     DATA_FRAME_TAIL};
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x91, 0x01, open ? (uint8_t) 0x01 : (uint8_t) 0x02, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
 
-    uint8_t trackFlagBitHigh;
-    uint8_t trackFlagBitLow;
-    getTrackFlagBit(&trackFlagBitHigh, &trackFlagBitLow);
+    if (open) {
+        uint8_t trackFlagBitHigh;
+        uint8_t trackFlagBitLow;
+        getTrackFlagBit(&trackFlagBitHigh, &trackFlagBitLow);
+    }
+}
+
+int8_t K230::getCameraSteeringGearAngleCache() {
+    return cameraSteeringGearAngle;
 }
 
 void K230::setCameraSteeringGearAngle(int8_t angle) {
+    cameraSteeringGearAngle = angle;
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x91, 0x02, (uint8_t) angle, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
     //Command.Judgment(buf);
@@ -399,28 +405,41 @@ void K230::setCameraSteeringGearAngle(int8_t angle) {
 }
 
 
-bool K230::getTrackFlagBit(uint8_t *trackFlagBitHigh, uint8_t *trackFlagBitLow) {
+bool K230::getTrackFlagBit(uint8_t* trackFlagBitHigh, uint8_t* trackFlagBitLow) {
     uint8_t buf[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    uint8_t sbuf[] = {0x091, 0x01};
+    uint8_t sbuf[2] = {0x091, 0x01};
     bool successful = awaitReturn(buf, sbuf, 2);
     if (successful) {
         *trackFlagBitHigh = buf[4];
         *trackFlagBitLow = buf[5];
 #if DE_BUG
-        Serial.print("[DEBUG] trackFlagBitHigh:");
+        Serial.print("[DEBUG] trackFlagBit:");
         logHex(buf[4]);
-        Serial.print(" trackFlagBitLow:");
         logHex(buf[5]);
         Serial.println();
 #endif
     }
-
-    //ExtSRAMInterface.ExMem_JudgeWrite(readBus, 0x00);
-
     return successful;
 }
 
-bool K230::qrRecognize(uint8_t *count, QrMessage *qrMessageArray, uint8_t maxLen) {
+
+/***
+ * 16版本
+ * @param flagBitHigh
+ * @return
+ */
+bool K230::getTrackFlagBit(uint16_t* flagBitHigh) {
+    uint8_t trackFlagBitHigh;
+    uint8_t trackFlagBitLow;
+    bool successful = getTrackFlagBit(&trackFlagBitHigh, &trackFlagBitLow);
+    if (successful) {
+        *flagBitHigh = trackFlagBitHigh << 8 | trackFlagBitLow;
+    }
+    return successful;
+}
+
+
+bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen) {
 #if DE_BUG
     Serial.println("qrRecognize...");
 #endif
@@ -503,7 +522,7 @@ bool K230::qrRecognize(uint8_t *count, QrMessage *qrMessageArray, uint8_t maxLen
             continue;
         }
 
-        QrMessage *qrMessage = qrMessageArray + qrId;
+        QrMessage* qrMessage = qrMessageArray + qrId;
 
         qrMessage->efficient = true;
         qrMessage->qrColor = K210Color(bufLong[6]);
@@ -549,7 +568,7 @@ bool K230::qrRecognize(uint8_t *count, QrMessage *qrMessageArray, uint8_t maxLen
     return hitCount >= s_count;
 }
 
-bool K230::trafficLightRecognize(K210Color *k210Color) {
+bool K230::trafficLightRecognize(K210Color* k210Color) {
     receiveTrack = false;
 
 #if DE_BUG
@@ -575,7 +594,7 @@ bool K230::trafficLightRecognize(K210Color *k210Color) {
     return successful;
 }
 
-bool K230::trafficLightRecognize_rigorous(K210Color *k210Color, uint16_t consecutiveEqualDegree, uint16_t maxRetry) {
+bool K230::trafficLightRecognize_rigorous(K210Color* k210Color, uint16_t consecutiveEqualDegree, uint16_t maxRetry) {
     receiveTrack = false;
 
     K210Color currentColor = K_NONE;
@@ -720,263 +739,293 @@ Car::Car() {
     straightLineSpeed = 20;
     turnLeftSpeed = 40;
     turnRightSpeed = 40;
-    straightLineKpSpeed = 30;
-    trimAttitudeKpSpeed = 30;
+
+    straightLineKpSpeed = 40;
+    trimKpSpeed = 30;
 
     outTime_ms = 10000;
-    trimOutTime_ms = 3000;
+    trimOutTime_ms = 1000;
+
+    trackResult = {};
+}
+
+void Car::clearCodeDisc() {
+    uint8_t buf[] = {DATA_FRAME_HEADER, 0x02, 0x07, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+
+    {
+        uint32_t com = 0;
+        for (uint8_t i = 2; i < 8 - 2; i++) {
+            com += buf[i];
+        }
+        buf[8 - 2] = static_cast<int8_t>(com % 256);
+    }
+
+    ExtSRAMInterface.ExMem_Write_Bytes(0x6008, buf, 8);
+#if DE_BUG
+    Serial.println("clearCodeDisc");
+#endif
+}
+
+uint16_t Car::getCodeDisc() {
+    uint16_t code = ExtSRAMInterface.ExMem_Read(0x6003) << 8 | ExtSRAMInterface.ExMem_Read(0x6002);
+#if DE_BUG
+    Serial.print("getCodeDisc:");
+    Serial.print(code);
+    Serial.println();
+#endif
+    return code;
+}
+
+uint16_t Car::getTrackLamp() {
+    uint16_t code = ExtSRAMInterface.ExMem_Read(0x6001) << 8 | ExtSRAMInterface.ExMem_Read(0x6000);
+#if DE_BUG
+    Serial.print("getTrackLamp:");
+    Serial.print(code);
+    Serial.println();
+#endif
+    return code;
 }
 
 void Car::turnLeft(bool trimCar) {
-    DCMotor.SpeedCtr(-turnLeftSpeed, turnLeftSpeed);
-    sleep(1600);
+    DCMotor.SpeedCtr(-40, 40);
+    sleep(1500);
+    DCMotor.Stop();
     if (trimCar) {
         this->trimCar();
     }
 }
 
 void Car::turnRight(bool trimCar) {
-    DCMotor.SpeedCtr(turnRightSpeed, -turnRightSpeed);
-    sleep(1600);
+    DCMotor.SpeedCtr(40, -40);
+    sleep(1500);
+    DCMotor.Stop();
     if (trimCar) {
         this->trimCar();
     }
 }
 
+void Car::trackTurnLeft(bool trimCar) {
+    DCMotor.SpeedCtr(-turnLeftSpeed, turnLeftSpeed);
+    rotationProcess();
+    DCMotor.Stop();
+    if (trimCar) {
+        this->trimCar();
+    }
+}
 
-void Car::straightLine() {
+void Car::trackTurnRight(bool trimCar) {
+    DCMotor.SpeedCtr(turnRightSpeed, -turnRightSpeed);
+    rotationProcess();
+    DCMotor.Stop();
+    if (trimCar) {
+        this->trimCar();
+    }
+}
+
+void Car::rotationProcess() {
+    //sleep(1500);
+
+    unsigned long startTime = millis();
+
+    while (millis() - startTime < outTime_ms) {
+        acceptTrackFlag();
+        if (!trackResult.bitCount) {
+            break;
+        }
+    }
+    while (millis() - startTime < outTime_ms) {
+        acceptTrackFlag();
+        if (trackResult.centerBitCount >= 3) {
+            break;
+        }
+    }
+
+    DCMotor.Stop();
+}
+
+void Car::waitCodeDisc(uint16_t distance) {
+    uint16_t old = getCodeDisc();
+    uint16_t add = 0;
+    while (true) {
+        uint16_t newCode = getCodeDisc();
+
+        // 计算变化量的绝对值，处理溢出和方向
+        uint16_t rawChange = newCode - old;
+        auto signedChange = static_cast<int16_t>(rawChange);
+        uint16_t change = abs(signedChange);
+
+        add += change;
+
+        if (add >= distance) {
+            return;
+        }
+        old = newCode; // 更新旧值，准备下一次循环
+    }
+}
+
+void Car::trackAdvance() {
     unsigned long startTime = millis();
 
     DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
 
     while (millis() - startTime < outTime_ms) {
-        TrackResult trackResult{};
+        acceptTrackFlag();
 
-        //TODO
-        float highOffset = 0;
+        if (trackResult.flagBit == 0) {
+            DCMotor.SpeedCtr(straightLineSpeed, straightLineSpeed);
+            waitCodeDisc(80);
+            if (trackResult.edgeBitCount >= 6) {
 
-        if (acceptTrackFlag(&trackResult)) {
-            continue;
-        }
-
-        if (trackResult.trackFlagHigh == 0) {
-            // 考虑进入特殊地形
-            DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
-            sleep(300);
-            acceptTrackFlag(&trackResult);
-
-
-            if (trackResult.lowEdgeBitCount >= 3) {
                 while (millis() - startTime < outTime_ms) {
-                    acceptTrackFlag(&trackResult);
+                    acceptTrackFlag();
 
                     //离开特殊地形
-                    if (trackResult.lowBitCount == 0) {
-                        sleep(300);
-                        acceptTrackFlag(&trackResult);
+                    if (trackResult.flagBit == 0) {
+                        DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
+                        waitCodeDisc(100);
+                        acceptTrackFlag();
                         break;
                     }
 
-                    // 此处反转输入bit 在离开时调用acceptTrackFlag(&trackResult);矫正
-                    trackResult.trackFlagHigh = ~trackResult.trackFlagHigh;
-                    trackResult.trackFlagLow = ~trackResult.trackFlagLow;
+                    trackResult.flagBit = ~trackResult.flagBit;
 
-                    uint8_t exclusionLonelinessTrackFlagBit = 0;
-                    //TODO lonelinessExclusion(&trackFlagBitHigh, 1, &exclusionLonelinessTrackFlagBit);
-                    centralPoint(&exclusionLonelinessTrackFlagBit, 1, nullptr, &highOffset);
+                    centralPoint((uint8_t*) &trackResult.flagBit, 2, nullptr, &trackResult.offset);
 
                     DCMotor.SpeedCtr(
-                            straightLineSpeed + ((int16_t) (highOffset * straightLineKpSpeed)),
-                            straightLineSpeed - ((int16_t) (highOffset * straightLineKpSpeed))
+                            straightLineSpeed,
+                            straightLineSpeed
                     );
 
                 }
-            }
 
+            }
         }
 
-        if ((trackResult.lowEdgeBitCount >= 3 || trackResult.lowBitCount >= 5) && millis() - startTime > 500) {
+        if ((trackResult.edgeBitCount >= 6 || trackResult.bitCount >= 12)) {
             DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
-            sleep((int32_t) (23000 / straightLineSpeed)); // TODO 烤鱼请使用读取码盘值获取更精准控制
+            waitCodeDisc(350);
             trimCar();
             break;
         }
 
+        if (inRand(trackResult.offset, -0.3, 0.3)) {
 
-        DCMotor.SpeedCtr(
-                straightLineSpeed + ((int16_t) (highOffset * straightLineKpSpeed)),
-                straightLineSpeed - ((int16_t) (highOffset * straightLineKpSpeed))
-        );
+            int16_t lSpeed = straightLineSpeed;
+            int16_t rSpeed = straightLineSpeed;
+
+            lSpeed += ((int16_t) (trackResult.offset * straightLineKpSpeed));
+            rSpeed -= ((int16_t) (trackResult.offset * straightLineKpSpeed));
+
+            DCMotor.SpeedCtr(
+                    lSpeed,
+                    rSpeed
+            );
+        } else {
+            trimCar();
+        }
+
     }
     DCMotor.Stop();
 }
 
-//void Car::trimCar() {
-//    unsigned long startTime = millis();
-//    while (millis() - startTime < trimOutTime_ms) {
-//        TrackResult trackResult{};
-//        //TODO
-//        float finalOffset = 0;
-//        if (acceptTrackFlag(&trackResult)) {
-//            continue;
-//        }
-//
-//        // 定义垂直对齐容差为 0.1
-//        /*float verticalAlignmentThreshold = 0;
-//        float verticalDifference = fabs(highOffset - lowOffset);
-//
-//        if (verticalDifference <= verticalAlignmentThreshold) {
-//            // 如果高低偏移量差值在容差范围内，认为车体对齐，使用加权平均来计算综合偏移
-//            float w1 = 0.6f, w2 = 0.4f;  // 权重反映各区域对最终偏移的信任程度
-//            finalOffset = (w1 * highOffset + w2 * lowOffset) / (w1 + w2);
-//        } else {
-//            // 如果偏差过大，认为车体存在倾斜问题，则只使用高位数据进行校正
-//            finalOffset = highOffset;
-//        }
-//
-//        // 如果校正后的偏差足够小（即两者已对齐），则退出校正循环
-//        if (verticalDifference <= verticalAlignmentThreshold) {
-//            break;
-//        }*/
-////        if (offset == 0) {
-////            /*DCMotor.Stop();
-////            unsigned long toBendTime = millis();
-////            while (millis() - toBendTime < 100) {
-////                acceptTrackFlag(&trackFlagBitHigh, nullptr, &offset);
-////            }
-////            acceptTrackFlag(&trackFlagBitHigh, nullptr, &offset);
-////            acceptTrackFlag(&trackFlagBitHigh, nullptr, &offset);*/
-////            /*if (offset == 0) {
-////                break;
-////            }*/
-////            break;
-////        }
-//        //DCMotor.SpeedCtr(offset > 0 ? trimAttitudeKpSpeed : -trimAttitudeKpSpeed, offset > 0 ? -trimAttitudeKpSpeed : trimAttitudeKpSpeed);
-//
-//        DCMotor.SpeedCtr(
-//                ((int16_t) (finalOffset * trimAttitudeKpSpeed)),
-//                -((int16_t) (finalOffset * trimAttitudeKpSpeed))
-//        );
-//
-//    }
-//
-//    DCMotor.Stop();
-//}
+void Car::advance(uint16_t distance) {
+    DCMotor.SpeedCtr(
+            straightLineSpeed,
+            straightLineSpeed
+    );
+    waitCodeDisc(distance);
+    DCMotor.Stop();
+}
 
-//void Car::trimCar() {
-//    unsigned long startTime = millis();
-//
-//    // 参数定义（可根据实际情况调试）
-//    const float expectedHigh   = 4.0f;       // 理想状态下高位区域的中心位置（例如"00011000"对应4）
-//    const float toleranceHigh  = 0.5f;        // 高位对齐容差
-//    const float toleranceSlope = 0.5f;        // 低位与高位中心差容差（斜率容差）
-//    const float maxAdjust      = 20.0f;       // 每次调整的最大幅度
-//    const float minAdjust      = 10.0f;       // 每次调整的最小幅度
-//    // 每次发出调整命令的持续时间（单位：毫秒），以及调整后等待车辆稳定的延时
-//    const unsigned long commandDuration = 30;
-//    const unsigned long settleDelay     = 100;
-//    // 调整系数，根据误差计算调整命令时的比例因子（可调）
-//    // trimAttitudeKpSpeed 为类成员，代表比例系数
-//
-//    // ---------- 步骤一：高位对齐 ----------
-//    while (millis() - startTime < trimOutTime_ms) {
-//        TrackResult trackResult{};
-//        if (!acceptTrackFlag(&trackResult)) {
-//            delay(20);
-//            continue;
-//        }
-//        float highOffset = trackResult.highOffset;
-//        float errorHigh = expectedHigh - highOffset;
-//        // 当高位误差大于容差时，需要调整
-//        if (fabs(errorHigh) < toleranceHigh) {
-//            // 高位对齐完成，退出步骤一循环
-//            break;
-//        }
-//        // 计算调整命令，误差正负直接反映需要调整的方向
-//        float adjust = trimAttitudeKpSpeed * errorHigh;
-//        // 确保调整幅度在[minAdjust, maxAdjust]区间内
-//        if (fabs(adjust) < minAdjust) {
-//            adjust = (adjust > 0 ? minAdjust : -minAdjust);
-//        }
-//        if (fabs(adjust) > maxAdjust) {
-//            adjust = (adjust > 0 ? maxAdjust : -maxAdjust);
-//        }
-//        /* 方向说明：
-//         * 当 errorHigh > 0 时，说明 highOffset < expectedHigh，
-//         * 即高位数据偏左（线条偏左），车辆实际相对太靠右，
-//         * 此时需要向左转（左电机减速、右电机加速），
-//         * 反之则向右转。 */
-//        if (errorHigh > 0) {
-//            DCMotor.SpeedCtr(-(int16_t)fabs(adjust), (int16_t)fabs(adjust));
-//        } else {
-//            DCMotor.SpeedCtr((int16_t)fabs(adjust), -(int16_t)fabs(adjust));
-//        }
-//        delay(commandDuration);
-//        DCMotor.Stop();
-//        delay(settleDelay);
-//    }
-//
-//    // ---------- 步骤二：低位斜率对齐 ----------
-//    while (millis() - startTime < trimOutTime_ms) {
-//        TrackResult trackResult{};
-//        if (!acceptTrackFlag(&trackResult)) {
-//            delay(20);
-//            continue;
-//        }
-//        float highOffset = trackResult.highOffset;
-//        float lowOffset  = trackResult.lowOffset;
-//        float errorSlope = lowOffset - highOffset;  // 理想情况为0
-//
-//        if (fabs(errorSlope) < toleranceSlope) {
-//            // 低位斜率对齐完成，退出步骤二循环
-//            break;
-//        }
-//        // 计算调整命令，根据斜率误差（errorSlope）的正负决定调整方向
-//        float adjust = trimAttitudeKpSpeed * errorSlope;
-//        if (fabs(adjust) < minAdjust) {
-//            adjust = (adjust > 0 ? minAdjust : -minAdjust);
-//        }
-//        if (fabs(adjust) > maxAdjust) {
-//            adjust = (adjust > 0 ? maxAdjust : -maxAdjust);
-//        }
-//        /* 方向说明：
-//         * 当 errorSlope > 0 时，低位中心大于高位中心，
-//         * 表示下部线条偏右，需要向左转；
-//         * 当 errorSlope < 0 时，则需要向右转。 */
-//        if (errorSlope > 0) {
-//            DCMotor.SpeedCtr(-(int16_t)fabs(adjust), (int16_t)fabs(adjust));
-//        } else {
-//            DCMotor.SpeedCtr((int16_t)fabs(adjust), -(int16_t)fabs(adjust));
-//        }
-//        delay(commandDuration);
-//        DCMotor.Stop();
-//        delay(settleDelay);
-//    }
-//
-//    DCMotor.Stop();
-//}
+void Car::recoil(uint16_t distance) {
+    DCMotor.SpeedCtr(
+            -straightLineSpeed,
+            -straightLineSpeed
+    );
+    waitCodeDisc(distance);
+    DCMotor.Stop();
+}
+
+void Car::trimCar() {
+
+#if DE_BUG
+    Serial.println("[DEBUG] in trimCar...");
+#endif
+
+    unsigned long startTime = millis();
+
+    while (millis() - startTime < trimOutTime_ms) {
+        acceptTrackFlag();
+        if (trackResult.offset == 0) {
+            break;
+        }
+#if DE_BUG
+        Serial.print("[DEBUG] offset:");
+        Serial.print(trackResult.offset);
+        Serial.println();
+#endif
+
+        DCMotor.SpeedCtr(
+                ((int16_t) (trackResult.offset * trimKpSpeed)),
+                -((int16_t) (trackResult.offset * trimKpSpeed))
+        );
+
+    }
+
+    DCMotor.Stop();
+
+#if DE_BUG
+    Serial.println("[DEBUG] end trimCar...");
+#endif
+}
 
 
+/*const float KP_ANGLE = 40.0; // 方向误差比例系数（角度调整）
+const float KP_POSITION = 20.0; // 位置误差比例系数（中线调整）
 
 
+*//***
+ * 微调车姿态
+ *//*
+void Car::trimCar() {
+
+#if DE_BUG
+    Serial.println("[DEBUG] in trimCar...");
+#endif
+
+    unsigned long startTime = millis();
+
+    while (millis() - startTime < trimOutTime_ms) {
+        acceptTrackFlag();
+
+        float angleError = trackResult.highOffset - trackResult.lowOffset;
+        float positionError = (trackResult.highOffset + trackResult.lowOffset) / 2.0f;
+        float adjustment = (KP_ANGLE * angleError) + (KP_POSITION * positionError);
+
+        if (fabs((double) angleError) < 0.1 && fabs((double) positionError) < 0.1) {
+            break;
+        }
+
+        DCMotor.SpeedCtr((int16_t) adjustment, (int16_t) -adjustment);
+    }
+
+    DCMotor.Stop();
+
+#if DE_BUG
+    Serial.println("[DEBUG] end trimCar...");
+#endif
+}*/
 
 
-bool Car::acceptTrackFlag(TrackResult *trackResult) {
-    uint8_t trackFlagHigh = 0;
-    uint8_t trackFlagLow = 0;
-    bool successful = k230.getTrackFlagBit(&trackFlagHigh, &trackFlagLow);
+bool Car::acceptTrackFlag() {
+    bool successful = k230.getTrackFlagBit(&trackResult.flagBitArray[0], &trackResult.flagBitArray[1]);
 
-    if (successful && trackResult != nullptr) {
-        trackResult->trackFlagHigh = trackFlagHigh;
-        trackResult->trackFlagLow = trackFlagLow;
-        centralPoint(&trackFlagHigh, 1, nullptr, &trackResult->highOffset);
-        centralPoint(&trackFlagLow, 1, nullptr, &trackResult->lowOffset);
-        trackResult->highBitCount = countBits(trackFlagHigh);
-        trackResult->lowBitCount = countBits(trackFlagLow);
-        trackResult->highCenterBitCount = countBits(&trackFlagHigh, 1, 2, 6);
-        trackResult->lowCenterBitCount = countBits(&trackFlagLow, 1, 2, 6);
-        trackResult->highEdgeBitCount = trackResult->highBitCount - trackResult->highCenterBitCount;
-        trackResult->lowEdgeBitCount = trackResult->lowBitCount - trackResult->lowCenterBitCount;
+    if (successful) {
+        trackResult.flagBit = trackResult.flagBitArray[0] << 8 | trackResult.flagBitArray[1];
+        centralPoint((uint8_t*) &trackResult.flagBitArray, 2, nullptr, &trackResult.offset);
+        trackResult.bitCount = countBits(trackResult.flagBitArray, 2);
+        trackResult.centerBitCount = countBits(trackResult.flagBitArray, 2, 4, 12);
+        trackResult.edgeBitCount = trackResult.bitCount - trackResult.centerBitCount;
     }
 
     return successful;
@@ -995,4 +1044,5 @@ TrafficLight trafficLightC(0x13);
 TrafficLight trafficLightD(0x14);
 StreetLamp streetLampA(0xFF);
 K230 k230(0x02);
+
 Car car;
