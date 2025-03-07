@@ -361,6 +361,9 @@ public:
 
     explicit K230(uint8_t id);
 
+
+    int8_t getCameraSteeringGearAngleCache();
+
     /***
     * 设置摄像头舵机角度
     * @param angle 角度 舵机角度，范围-80至+40，0度垂直于车身
@@ -376,9 +379,17 @@ public:
      * 获取寻迹标志位
      * 高八位为靠近中心点
      * 该函数需要开启寻迹
+     *
      * @return
      */
     bool getTrackFlagBit(uint8_t* trackFlagBitHigh, uint8_t* trackFlagBitLow);
+
+    /***
+     * 16版本
+     * @param flagBitHigh
+     * @return
+     */
+    bool getTrackFlagBit(uint16_t* flagBitHigh);
 
     /***
      *
@@ -413,19 +424,17 @@ public:
 
 private:
     bool receiveTrack;
+    int8_t cameraSteeringGearAngle;
 };
 
 struct TrackResult {
-    uint8_t trackFlagHigh;
-    uint8_t trackFlagLow;
-    float highOffset;
-    float lowOffset;
-    uint8_t highBitCount;
-    uint8_t lowBitCount;
-    uint8_t highCenterBitCount;
-    uint8_t lowCenterBitCount;
-    uint8_t highEdgeBitCount;
-    uint8_t lowEdgeBitCount;
+    uint8_t flagBitArray[2] = {};
+    uint16_t flagBit;
+    float offset;
+    uint8_t bitCount;
+    uint8_t centerBitCount;
+    uint8_t edgeBitCount;
+
 };
 
 /***
@@ -456,7 +465,7 @@ public:
  * 直行到下一个路口
  * @param carSpeed
  */
-    void straightLine();
+    void trackAdvance();
 
     /***
      * 前进一段距离
@@ -470,9 +479,13 @@ public:
  */
     void recoil(uint16_t distance);
 
-    void turnLeft(bool trimCar = true);
+    void trackTurnLeft(bool trimCar = true);
 
-    void turnRight(bool trimCar = true);
+    void trackTurnRight(bool trimCar = true);
+
+    void turnLeft(bool trimCar);
+
+    void turnRight(bool trimCar);
 
     /***
      * 微调车姿态

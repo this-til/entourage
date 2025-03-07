@@ -391,7 +391,12 @@ void K230::setTrackModel(bool open) {
     }
 }
 
+int8_t K230::getCameraSteeringGearAngleCache() {
+    return cameraSteeringGearAngle;
+}
+
 void K230::setCameraSteeringGearAngle(int8_t angle) {
+    cameraSteeringGearAngle = angle;
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x91, 0x02, (uint8_t) angle, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
     //Command.Judgment(buf);
@@ -408,15 +413,31 @@ bool K230::getTrackFlagBit(uint8_t* trackFlagBitHigh, uint8_t* trackFlagBitLow) 
         *trackFlagBitHigh = buf[4];
         *trackFlagBitLow = buf[5];
 #if DE_BUG
-        Serial.print("[DEBUG] trackFlagBitHigh:");
+        Serial.print("[DEBUG] trackFlagBit:");
         logHex(buf[4]);
-        Serial.print(" trackFlagBitLow:");
         logHex(buf[5]);
         Serial.println();
 #endif
     }
     return successful;
 }
+
+
+/***
+ * 16版本
+ * @param flagBitHigh
+ * @return
+ */
+bool K230::getTrackFlagBit(uint16_t* flagBitHigh) {
+    uint8_t trackFlagBitHigh;
+    uint8_t trackFlagBitLow;
+    bool successful = getTrackFlagBit(&trackFlagBitHigh, &trackFlagBitLow);
+    if (successful) {
+        *flagBitHigh = trackFlagBitHigh << 8 | trackFlagBitLow;
+    }
+    return successful;
+}
+
 
 bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen) {
 #if DE_BUG
@@ -719,7 +740,7 @@ Car::Car() {
     turnLeftSpeed = 40;
     turnRightSpeed = 40;
 
-    straightLineKpSpeed = 30;
+    straightLineKpSpeed = 40;
     trimKpSpeed = 30;
 
     outTime_ms = 10000;
@@ -766,6 +787,24 @@ uint16_t Car::getTrackLamp() {
 }
 
 void Car::turnLeft(bool trimCar) {
+    DCMotor.SpeedCtr(-40, 40);
+    sleep(1500);
+    DCMotor.Stop();
+    if (trimCar) {
+        this->trimCar();
+    }
+}
+
+void Car::turnRight(bool trimCar) {
+    DCMotor.SpeedCtr(40, -40);
+    sleep(1500);
+    DCMotor.Stop();
+    if (trimCar) {
+        this->trimCar();
+    }
+}
+
+void Car::trackTurnLeft(bool trimCar) {
     DCMotor.SpeedCtr(-turnLeftSpeed, turnLeftSpeed);
     rotationProcess();
     DCMotor.Stop();
@@ -774,7 +813,7 @@ void Car::turnLeft(bool trimCar) {
     }
 }
 
-void Car::turnRight(bool trimCar) {
+void Car::trackTurnRight(bool trimCar) {
     DCMotor.SpeedCtr(turnRightSpeed, -turnRightSpeed);
     rotationProcess();
     DCMotor.Stop();
@@ -784,14 +823,24 @@ void Car::turnRight(bool trimCar) {
 }
 
 void Car::rotationProcess() {
-    sleep(1500);
+    //sleep(1500);
 
-/*    unsigned long startTime = millis();
+    unsigned long startTime = millis();
+
     while (millis() - startTime < outTime_ms) {
-        if (inRand(trackResult.lowCenterBitCount, 1, 3) && inRand(trackResult.highCenterBitCount, 1, 3)) {
+        acceptTrackFlag();
+        if (!trackResult.bitCount) {
             break;
         }
-    }*/
+    }
+    while (millis() - startTime < outTime_ms) {
+        acceptTrackFlag();
+        if (trackResult.centerBitCount >= 3) {
+            break;
+        }
+    }
+
+    DCMotor.Stop();
 }
 
 void Car::waitCodeDisc(uint16_t distance) {
@@ -814,7 +863,7 @@ void Car::waitCodeDisc(uint16_t distance) {
     }
 }
 
-void Car::straightLine() {
+void Car::trackAdvance() {
     unsigned long startTime = millis();
 
     DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
@@ -822,48 +871,57 @@ void Car::straightLine() {
     while (millis() - startTime < outTime_ms) {
         acceptTrackFlag();
 
-        if (trackResult.trackFlagLow == 0 && trackResult.highEdgeBitCount >= 3) {
-            while (millis() - startTime < outTime_ms) {
-                acceptTrackFlag();
+        if (trackResult.flagBit == 0) {
+            DCMotor.SpeedCtr(straightLineSpeed, straightLineSpeed);
+            waitCodeDisc(80);
+            if (trackResult.edgeBitCount >= 6) {
 
-                //离开特殊地形
-                if (trackResult.lowBitCount == 0) {
-                    DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
-                    waitCodeDisc(40);
+                while (millis() - startTime < outTime_ms) {
                     acceptTrackFlag();
-                    break;
+
+                    //离开特殊地形
+                    if (trackResult.flagBit == 0) {
+                        DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
+                        waitCodeDisc(100);
+                        acceptTrackFlag();
+                        break;
+                    }
+
+                    trackResult.flagBit = ~trackResult.flagBit;
+
+                    centralPoint((uint8_t*) &trackResult.flagBit, 2, nullptr, &trackResult.offset);
+
+                    DCMotor.SpeedCtr(
+                            straightLineSpeed,
+                            straightLineSpeed
+                    );
+
                 }
-
-                // 此处反转输入bit 在离开时调用acceptTrackFlag(&trackResult);矫正
-                trackResult.trackFlagHigh = ~trackResult.trackFlagHigh;
-                trackResult.trackFlagLow = ~trackResult.trackFlagLow;
-
-                centralPoint(&trackResult.trackFlagLow, 1, nullptr, &trackResult.lowOffset);
-                centralPoint(&trackResult.trackFlagHigh, 1, nullptr, &trackResult.highOffset);
-
-                int16_t offsetSpeed = tristate(trackResult.lowOffset, -straightLineKpSpeed, 0, straightLineSpeed);
-                DCMotor.SpeedCtr(
-                        straightLineSpeed + offsetSpeed,
-                        straightLineSpeed - offsetSpeed
-                );
 
             }
         }
 
-        if ((trackResult.lowEdgeBitCount >= 3 || trackResult.lowBitCount >= 5) && millis() - startTime > 500) {
+        if ((trackResult.edgeBitCount >= 6 || trackResult.bitCount >= 12)) {
             DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
-            waitCodeDisc(450);
+            waitCodeDisc(350);
             trimCar();
             break;
         }
 
-        if (trackResult.lowOffset > 0.5 || trackResult.lowOffset < -0.5) {
-            trimCar();
-        } else {
+        if (inRand(trackResult.offset, -0.3, 0.3)) {
+
+            int16_t lSpeed = straightLineSpeed;
+            int16_t rSpeed = straightLineSpeed;
+
+            lSpeed += ((int16_t) (trackResult.offset * straightLineKpSpeed));
+            rSpeed -= ((int16_t) (trackResult.offset * straightLineKpSpeed));
+
             DCMotor.SpeedCtr(
-                    straightLineSpeed + ((int16_t) (trackResult.lowOffset * trimKpSpeed)),
-                    straightLineSpeed - ((int16_t) (trackResult.lowOffset * trimKpSpeed))
+                    lSpeed,
+                    rSpeed
             );
+        } else {
+            trimCar();
         }
 
     }
@@ -898,18 +956,18 @@ void Car::trimCar() {
 
     while (millis() - startTime < trimOutTime_ms) {
         acceptTrackFlag();
-        if (trackResult.lowOffset == 0) {
+        if (trackResult.offset == 0) {
             break;
         }
 #if DE_BUG
-        Serial.println("[DEBUG] lowOffset:");
-        Serial.print(trackResult.lowOffset);
+        Serial.print("[DEBUG] offset:");
+        Serial.print(trackResult.offset);
         Serial.println();
 #endif
 
         DCMotor.SpeedCtr(
-                ((int16_t) (trackResult.lowOffset * trimKpSpeed)),
-                -((int16_t) (trackResult.lowOffset * trimKpSpeed))
+                ((int16_t) (trackResult.offset * trimKpSpeed)),
+                -((int16_t) (trackResult.offset * trimKpSpeed))
         );
 
     }
@@ -922,15 +980,13 @@ void Car::trimCar() {
 }
 
 
-
-/***
- * 微调车姿态
- */
-/*
-
-const float KP_ANGLE = 40.0; // 方向误差比例系数（角度调整）
+/*const float KP_ANGLE = 40.0; // 方向误差比例系数（角度调整）
 const float KP_POSITION = 20.0; // 位置误差比例系数（中线调整）
 
+
+*//***
+ * 微调车姿态
+ *//*
 void Car::trimCar() {
 
 #if DE_BUG
@@ -962,21 +1018,14 @@ void Car::trimCar() {
 
 
 bool Car::acceptTrackFlag() {
-    uint8_t trackFlagHigh = 0;
-    uint8_t trackFlagLow = 0;
-    bool successful = k230.getTrackFlagBit(&trackFlagHigh, &trackFlagLow);
+    bool successful = k230.getTrackFlagBit(&trackResult.flagBitArray[0], &trackResult.flagBitArray[1]);
 
     if (successful) {
-        trackResult.trackFlagHigh = trackFlagHigh;
-        trackResult.trackFlagLow = trackFlagLow;
-        centralPoint(&trackFlagHigh, 1, nullptr, &trackResult.highOffset);
-        centralPoint(&trackFlagLow, 1, nullptr, &trackResult.lowOffset);
-        trackResult.highBitCount = countBits(trackFlagHigh);
-        trackResult.lowBitCount = countBits(trackFlagLow);
-        trackResult.highCenterBitCount = countBits(&trackFlagHigh, 1, 2, 6);
-        trackResult.lowCenterBitCount = countBits(&trackFlagLow, 1, 2, 6);
-        trackResult.highEdgeBitCount = trackResult.highBitCount - trackResult.highCenterBitCount;
-        trackResult.lowEdgeBitCount = trackResult.lowBitCount - trackResult.lowCenterBitCount;
+        trackResult.flagBit = trackResult.flagBitArray[0] << 8 | trackResult.flagBitArray[1];
+        centralPoint((uint8_t*) &trackResult.flagBitArray, 2, nullptr, &trackResult.offset);
+        trackResult.bitCount = countBits(trackResult.flagBitArray, 2);
+        trackResult.centerBitCount = countBits(trackResult.flagBitArray, 2, 4, 12);
+        trackResult.edgeBitCount = trackResult.bitCount - trackResult.centerBitCount;
     }
 
     return successful;
