@@ -741,12 +741,20 @@ Car::Car() {
     turnRightSpeed = 40;
 
     straightLineKpSpeed = 40;
-    trimKpSpeed = 30;
+    trimKpSpeed = 40;
 
     outTime_ms = 10000;
     trimOutTime_ms = 1000;
 
     trackResult = {};
+}
+
+void Car::carSleep(uint16_t time) {
+    unsigned long startTime = millis();
+
+    while (millis() - startTime < time) {
+        acceptTrackFlag();
+    }
 }
 
 void Car::clearCodeDisc() {
@@ -873,28 +881,42 @@ void Car::trackAdvance() {
 
         if (trackResult.flagBit == 0) {
             DCMotor.SpeedCtr(straightLineSpeed, straightLineSpeed);
-            waitCodeDisc(80);
-            if (trackResult.edgeBitCount >= 6) {
-
+            waitCodeDisc(100);
+            acceptTrackFlag();
+            if (trackResult.edgeBitCount >= 3) {
                 while (millis() - startTime < outTime_ms) {
                     acceptTrackFlag();
 
                     //离开特殊地形
                     if (trackResult.flagBit == 0) {
                         DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
-                        waitCodeDisc(100);
+                        waitCodeDisc(200);
                         acceptTrackFlag();
                         break;
                     }
 
-                    trackResult.flagBit = ~trackResult.flagBit;
+                    /*trackResult.flagBit = ~trackResult.flagBit;
 
-                    centralPoint((uint8_t*) &trackResult.flagBit, 2, nullptr, &trackResult.offset);
+                    uint8_t buf[2] = {};
+                    lonelinessExclusion(trackResult.flagBitArray, 2, buf);
+                    centralPoint(buf, 2, nullptr, &trackResult.offset);
 
-                    DCMotor.SpeedCtr(
-                            straightLineSpeed,
-                            straightLineSpeed
-                    );
+                    if (inRand(trackResult.offset, -0.3, 0.3)) {
+                        int16_t lSpeed = straightLineSpeed;
+                        int16_t rSpeed = straightLineSpeed;
+
+                        lSpeed += ((int16_t) (trackResult.offset * straightLineKpSpeed));
+                        rSpeed -= ((int16_t) (trackResult.offset * straightLineKpSpeed));
+
+                        DCMotor.SpeedCtr(
+                                lSpeed,
+                                rSpeed
+                        );
+                    } else {
+                        trimCar();
+                    }*/
+
+                    DCMotor.SpeedCtr(straightLineSpeed, straightLineSpeed);
 
                 }
 
@@ -946,6 +968,35 @@ void Car::recoil(uint16_t distance) {
     DCMotor.Stop();
 }
 
+void Car::mobileCorrection(uint16_t step) {
+    unsigned long startTime = millis();
+    uint8_t positiveAttitude = 0;
+    bool advanceTag = true;
+    while (millis() - startTime < outTime_ms) {
+        if (advanceTag) {
+            advance(step);
+        } else {
+            recoil(step);
+        }
+        advanceTag = !advanceTag;
+
+        carSleep(200);
+        acceptTrackFlag();
+        bool inRand = inRand(trackResult.offset, -0.2, 0.2);
+        trimCar();
+        if (inRand) {
+            positiveAttitude++;
+            if (positiveAttitude >= 3) {
+                break;
+            }
+            continue;
+        }
+
+        positiveAttitude = 0;
+
+    }
+}
+
 void Car::trimCar() {
 
 #if DE_BUG
@@ -966,10 +1017,11 @@ void Car::trimCar() {
 #endif
 
         DCMotor.SpeedCtr(
-                ((int16_t) (trackResult.offset * trimKpSpeed)),
-                -((int16_t) (trackResult.offset * trimKpSpeed))
+                ((int16_t) (tristate(trackResult.offset, -20, 0, 20))),
+                ((int16_t) (tristate(trackResult.offset, 20, 0, -20)))
         );
-
+        sleep((uint16_t) (200 * abs(trackResult.offset)));
+        DCMotor.Stop();
     }
 
     DCMotor.Stop();

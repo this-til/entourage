@@ -251,6 +251,7 @@ void KEY_Handler(uint8_t k_value) {
 
                 car.turnLeft(false);
                 car.recoil(300);
+                car.mobileCorrection(200);
                 car.trimCar();
 
                 car.trackAdvance();
@@ -283,8 +284,10 @@ void KEY_Handler(uint8_t k_value) {
             /* car.getCodeDisc();
              car.clearCodeDisc();
              car.getCodeDisc();*/
-            k230.setCameraSteeringGearAngle(-55);
-            car.recoil(100);
+            k230.setCameraSteeringGearAngle(-80);
+            k230.setTrackModel(true);
+            car.mobileCorrection(200);
+            k230.setTrackModel(false);
             break;
     }
 }

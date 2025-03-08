@@ -445,6 +445,8 @@ class Car {
 public:
     Car();
 
+    void carSleep(uint16_t time);
+
     /***
      * 清除车的码盘值
      */
@@ -492,6 +494,8 @@ public:
      */
     void trimCar();
 
+    void mobileCorrection(uint16_t step);
+
     bool acceptTrackFlag();
 
     int16_t straightLineSpeed;
@@ -508,6 +512,7 @@ public:
     unsigned long trimOutTime_ms;
     unsigned long outTime_ms;
 
+
 private:
     // PID 状态变量：用于跨循环累积（每次 trimCar 调用开始时会重置）
     float pid_integral{};
@@ -522,6 +527,7 @@ private:
      * @param 等待码盘的变化量达到指定值(不检测正反)
      */
     void waitCodeDisc(uint16_t distance);
+
 };
 
 /***

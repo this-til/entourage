@@ -327,7 +327,7 @@ RECTANGLES = []
 # RECTANGLES = HIGH_RECTANGLES + LOW_RECTANGLES
 # RECTANGLES_ROTATIONAL_TIME = HIGH_RECTANGLES + LOW_RECTANGLES_ROTATIONAL_TIME
 
-LINE_COLOR_THRESHOLD = [(0, 45)]
+LINE_COLOR_THRESHOLD = [(0, 30)]
 
 
 def initTrack():
@@ -769,7 +769,7 @@ if __name__ == '__main__':
             if openTrack:
                 track(primitiveImg, img, True)
 
-            drawLogs(img)
+            # drawLogs(img)
 
             lcd.display(img)
         except Exception as err:
