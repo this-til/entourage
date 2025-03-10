@@ -225,7 +225,7 @@ void KEY_Handler(uint8_t k_value) {
             //k230.setCameraSteeringGearAngle(0);
             //k230.qrRecognize(&count, qrMessageArray, 4);
 
-            k230.setCameraSteeringGearAngle(-80);
+            k230.setCameraSteeringGearAngle(-55);
             k230.setTrackModel(true);
 
 
@@ -244,15 +244,15 @@ void KEY_Handler(uint8_t k_value) {
             //k230.setTrackModel(true);
             //car.trimCar(60, 10000);
             //k230.setTrackModel(false);
-            k230.setCameraSteeringGearAngle(-80);
+            k230.setCameraSteeringGearAngle(-55);
             k230.setTrackModel(true);
             for (int i = 0; i < 100; ++i) {
                 car.trackAdvance();
-
-                car.turnLeft(false);
-                car.recoil(300);
-                car.mobileCorrection(200);
-                car.trimCar();
+                car.trackTurnLeft();
+                //car.turnLeft(false);
+                //car.recoil(300);
+                //car.mobileCorrection(200);
+                //car.trimCar();
 
                 car.trackAdvance();
                 car.trackTurnLeft();
@@ -274,7 +274,7 @@ void KEY_Handler(uint8_t k_value) {
 
             break;
         case 0x03:
-            k230.setCameraSteeringGearAngle(-80);
+            k230.setCameraSteeringGearAngle(-55);
             k230.setTrackModel(true);
             car.trimCar();
             k230.setTrackModel(false);
@@ -284,7 +284,7 @@ void KEY_Handler(uint8_t k_value) {
             /* car.getCodeDisc();
              car.clearCodeDisc();
              car.getCodeDisc();*/
-            k230.setCameraSteeringGearAngle(-80);
+            k230.setCameraSteeringGearAngle(-55);
             k230.setTrackModel(true);
             car.mobileCorrection(200);
             k230.setTrackModel(false);

@@ -903,21 +903,39 @@ void Car::turnRight(bool trimCar) {
 }
 
 void Car::trackTurnLeft(bool trimCar) {
+    DCMotor.Stop();
+
+    int8_t angle = k230.getCameraSteeringGearAngleCache();
+    k230.setCameraSteeringGearAngle(-80);
+    carSleep(100);
+
     DCMotor.SpeedCtr(-turnLeftSpeed, turnLeftSpeed);
     rotationProcess();
     DCMotor.Stop();
     if (trimCar) {
         this->trimCar();
     }
+    k230.setCameraSteeringGearAngle(angle);
+    carSleep(100);
 }
 
 void Car::trackTurnRight(bool trimCar) {
+    DCMotor.Stop();
+    carSleep(100);
+
+    int8_t angle = k230.getCameraSteeringGearAngleCache();
+    k230.setCameraSteeringGearAngle(-80);
+    carSleep(100);
+
     DCMotor.SpeedCtr(turnRightSpeed, -turnRightSpeed);
     rotationProcess();
     DCMotor.Stop();
     if (trimCar) {
         this->trimCar();
     }
+
+    k230.setCameraSteeringGearAngle(angle);
+    carSleep(100);
 }
 
 void Car::rotationProcess() {
@@ -970,22 +988,27 @@ void Car::trackAdvance() {
         acceptTrackFlag();
 
         if (trackResult.flagBit == 0) {
+
+
             DCMotor.SpeedCtr(straightLineSpeed, straightLineSpeed);
             waitCodeDisc(100);
             acceptTrackFlag();
+
             if (trackResult.edgeBitCount >= 3) {
                 while (millis() - startTime < outTime_ms) {
                     acceptTrackFlag();
 
                     //离开特殊地形
                     if (trackResult.flagBit == 0) {
+
                         DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
                         waitCodeDisc(200);
                         acceptTrackFlag();
                         break;
+
                     }
 
-                    /*trackResult.flagBit = ~trackResult.flagBit;
+                    trackResult.flagBit = ~trackResult.flagBit;
 
                     uint8_t buf[2] = {};
                     lonelinessExclusion(trackResult.flagBitArray, 2, buf);
@@ -1004,20 +1027,24 @@ void Car::trackAdvance() {
                         );
                     } else {
                         trimCar();
-                    }*/
+                    }
 
                     DCMotor.SpeedCtr(straightLineSpeed, straightLineSpeed);
 
                 }
 
+
             }
         }
 
         if ((trackResult.edgeBitCount >= 6 || trackResult.bitCount >= 12)) {
+
+
             DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
-            waitCodeDisc(350);
+            waitCodeDisc(500);
             trimCar();
             break;
+
         }
 
         if (inRand(trackResult.offset, -0.3, 0.3)) {
