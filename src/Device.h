@@ -109,9 +109,8 @@ protected:
     uint8_t readLen;
     bool readVerify;
     bool readTailIntegrity;
+    bool readHeadIntegrity;
     unsigned long readOutTime_ms;
-
-    bool debug;
 };
 
 /***
@@ -154,10 +153,26 @@ public:
     void setGateControl(bool open);
 
     /***
+     * debug
+     * 设置初始角度
+     *
+     * @param isUp true 闸门上升
+     */
+    void setInitialPos(bool isUp);
+
+    /***
+     * 发送车牌
+     * @param data len = 6
+     * @return
+     */
+    void setLicensePlateData(uint8_t* data);
+
+    /***
      * 获取门闸
      * "智能道闸标志物处于关闭状态时请求回传状态，不会回传任何指令。"
      */
     bool getGateControl();
+
 };
 
 /***
@@ -254,7 +269,7 @@ public:
 
     /***
      * 设置数码管显示指定数据
-     * @param pos 第几个数码管 1:第一排 2:第二排
+     * @param pos 第几排数码管 1:第一排 2:第二排
      * @param value[] 值 0~9 长度6
      */
     void setDisplayData(uint8_t pos, const uint8_t value[]);
@@ -299,7 +314,7 @@ public:
     * @param ventral out 前侧
     * @param rearSide out 后侧
     */
-    void getInfraredState(bool* ventral, bool* rearSide);
+    bool getInfraredState(bool* ventral, bool* rearSide);
 
 
 };
@@ -323,6 +338,12 @@ public:
 
 };
 
+enum LightSourceIntensity {
+    ONR = 0x0C,
+    TWO = 0x18,
+    THERE = 0x5E,
+};
+
 /***
  * 路灯
  */
@@ -331,12 +352,159 @@ public:
     explicit StreetLamp(uint8_t id);
 
     //TODO 无线通信
+
+    void setLightSourceIntensity(LightSourceIntensity lightSourceIntensity);
 };
 
 /***
  * 信息显示物(广告牌)
  */
 class AdvertisingBoard : DeviceBase {
+    explicit AdvertisingBoard(uint8_t id);
+};
+
+/***
+ * 无线充电
+ */
+class WirelessCharging : DeviceBase {
+public:
+    explicit WirelessCharging(uint8_t id);
+
+    /***
+     * debug
+     * 开启无线充电模式
+     * 之后调用openWirelessCharging
+     * @param open
+     */
+    void setOpenWirelessCharging(bool open);
+
+    /***
+     * 开启无线充电
+     * @param openCode len = 3
+     */
+    void openWirelessCharging(uint8_t* openCode);
+
+
+    /***
+     * debug
+     * @param openCode len = 3
+     */
+    void setWirelessChargingOpenCode(uint8_t* openCode);
+};
+
+enum PageTurningMode {
+    UP = 0x01,
+    UNDER = 0x02,
+    AUTOMATIC_PAGE_TURNING = 0x03
+};
+
+enum InformationDisplayTimingMode {
+    OFF = 0x01,
+    NO = 0x02,
+    ZERO = 0x03,
+};
+
+/***
+ * 进制格式
+ */
+enum BaseFormat {
+    //16
+    F_HEX = 0x40,
+    //10
+    F_DEC = 0x50
+};
+
+enum TrafficSigns {
+    /***
+     *  直行
+     */
+    TurnRun = 0x01,
+    /***
+     *  左转
+     */
+    TurnLeft = 0x02,
+    /***
+     *  右转
+     */
+    TurnRight = 0x03,
+    /***
+     *  掉头
+     */
+    TurnRound = 0x04,
+    /***
+     *  禁止直行
+     */
+    NO_STRAIGHT = 0x05,
+    /***
+     *  禁止通行
+     */
+    NO_ACCESS = 0x06
+};
+
+/***
+ * 信息显示物
+ */
+class InformationDisplay : DeviceBase {
+public:
+    explicit InformationDisplay(uint8_t id);
+
+    /***
+     * 显示指定图片
+     * @return
+     */
+    void showSpecifiedPicture(uint8_t id);
+
+    /***
+     * 设置翻页模式
+     */
+    void setThePageTurningMode(PageTurningMode pageTurningMode);
+
+    /***
+     * 显示车牌
+     * @param licensePlate len = 6
+     */
+    void showLicensePlate(uint8_t* licensePlate);
+
+    /***
+     * 设置显示模式
+     * @param timingMode
+     */
+    void setTimingMode(InformationDisplayTimingMode timingMode);
+
+    /***
+     * 显示数据
+     * @param data len = 3 (十进制仅两位有效，但还是给3长度)
+     */
+    void showData(uint8_t* data, BaseFormat baseFormat);
+
+    /***
+     * 显示交通标志
+     * @param trafficSigns
+     */
+    void showTrafficSigns(TrafficSigns trafficSigns);
+
+};
+
+class ETC : DeviceBase {
+
+public:
+    explicit ETC(uint8_t id);
+
+    /***
+    * debug
+    * 设置初始角度
+    *
+    * @param true 闸门上升
+    */
+    void setInitialPos(bool lUp, bool rUp);
+
+    //TODO 回传接收
+};
+
+class StereoscopicDisplay : DeviceBase {
+public:
+
+    explicit StereoscopicDisplay(uint8_t id);
 
 };
 
@@ -530,10 +698,6 @@ private:
 
 };
 
-/***
- * 报警台
- */
-extern AlarmDesk alarmDeskA;
 
 /***
  * 智能道闸标控制
@@ -546,7 +710,7 @@ extern BarrierGate barrierGateA;
 extern BusStop busStopA;
 
 /***
- *  智能显示标志物控制
+ *  智能显示(大屏)
  */
 extern Monitor monitorA;
 
@@ -564,10 +728,35 @@ extern TrafficLight trafficLightB;
 extern TrafficLight trafficLightC;
 extern TrafficLight trafficLightD;
 
+
+/***
+ * 无线充电
+ */
+extern WirelessCharging wirelessChargingA;
+
+/***
+ * 信息显示
+ */
+extern InformationDisplay informationDisplayA;
+extern InformationDisplay informationDisplayB;
+extern InformationDisplay informationDisplayC;
+
+//===============红外========
+
+/***
+ * 报警台
+ */
+extern AlarmDesk alarmDeskA;
+
 /***
  * 路灯
  */
 extern StreetLamp streetLampA;
+
+/***
+ * 立体显示物
+ */
+extern StereoscopicDisplay stereoscopicDisplay;
 
 /***
  * 摄像头

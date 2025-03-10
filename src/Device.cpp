@@ -16,9 +16,8 @@ DeviceBase::DeviceBase(uint8_t id) {
     this->readLen = 8;
     this->readVerify = true;
     this->readTailIntegrity = true;
+    this->readHeadIntegrity = true;
     this->readOutTime_ms = 500;
-
-    this->debug = true;
 }
 
 void DeviceBase::send(uint8_t* buf) {
@@ -42,7 +41,7 @@ void DeviceBase::send(uint8_t* buf) {
 }
 
 bool DeviceBase::check(const uint8_t* buf, const uint8_t* serviceId, uint8_t serviceLen) {
-    if (buf[0] != DATA_FRAME_HEADER) {
+    if (readHeadIntegrity && buf[0] != DATA_FRAME_HEADER) {
 #if DE_BUG
         Serial.print("  inaccuracy header:");
         logHex(buf[0]);
@@ -178,17 +177,30 @@ BarrierGate::BarrierGate(uint8_t id) : DeviceBase(id) {
 }
 
 void BarrierGate::setGateControl(bool open) {
-    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x01, static_cast<uint8_t>(open ? 0x01 : 0x02), 0x00, 0x00, 0x00,
-                     DATA_FRAME_TAIL};
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x01, static_cast<uint8_t>(open ? 0x01 : 0x02), 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
+}
+
+void BarrierGate::setInitialPos(bool isUp) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x09, static_cast<uint8_t>(isUp ? 0x01 : 0x02), 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+    send(buf);
+}
+
+void BarrierGate::setLicensePlateData(uint8_t* data) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x10, data[5], data[4], data[3], 0x00, DATA_FRAME_TAIL};
+    send(buf);
+
+    uint8_t buf2[] = {DATA_FRAME_HEADER, id, 0x11, data[2], data[1], data[0], 0x00, DATA_FRAME_TAIL};
+    send(buf2);
 }
 
 bool BarrierGate::getGateControl() {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x20, 0x01, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
 
-    return awaitReturn(buf, 0x01);;
+    return awaitReturn(buf, 0x01);
 }
+
 
 BusStop::BusStop(uint8_t id) : DeviceBase(id) {
 }
@@ -324,8 +336,7 @@ void Monitor::setTimingMode(TimingMode timingMode) {
 }
 
 void Monitor::setDistance(uint16_t distance_mm) {
-    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x04, 0x00, (uint8_t) (distance_mm >> 8), (uint8_t) distance_mm, 0x00,
-                     DATA_FRAME_TAIL};
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x04, 0x00, (uint8_t) (distance_mm >> 8), (uint8_t) distance_mm, 0x00, DATA_FRAME_TAIL};
     send(buf);
 }
 
@@ -348,14 +359,15 @@ bool Carport::getLevel(uint8_t* level) {
     return successful;
 }
 
-void Carport::getInfraredState(bool* ventral, bool* rearSide) {
+bool Carport::getInfraredState(bool* ventral, bool* rearSide) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x02, 0x02, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     send(buf);
-
-    if (awaitReturn(buf, 0x02)) {
+    bool s = awaitReturn(buf, 0x02);
+    if (s) {
         *ventral = buf[4] == 0x01;
         *rearSide = buf[5] == 0x02;
     }
+    return s;
 }
 
 TrafficLight::TrafficLight(uint8_t id) : DeviceBase(id) {
@@ -372,6 +384,84 @@ void TrafficLight::requestConfirmationOfIdentificationResults(TrafficLightModel 
 }
 
 StreetLamp::StreetLamp(uint8_t id) : DeviceBase(id) {}
+
+void StreetLamp::setLightSourceIntensity(LightSourceIntensity lightSourceIntensity) {
+    uint8_t buf[4] = {0x00, 0xFF, (uint8_t) lightSourceIntensity, (uint8_t) ~lightSourceIntensity};
+    Infrare.Transmition(buf, 4);
+}
+
+AdvertisingBoard::AdvertisingBoard(uint8_t id) : DeviceBase(id) {
+
+}
+
+WirelessCharging::WirelessCharging(uint8_t id) : DeviceBase(id) {
+
+}
+
+void WirelessCharging::setOpenWirelessCharging(bool open) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x01, static_cast<uint8_t>(open ? 0x01 : 0x02), 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+    send(buf);
+}
+
+void WirelessCharging::openWirelessCharging(uint8_t* openCode) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x02, openCode[2], openCode[1], openCode[0], 0x00, DATA_FRAME_TAIL};
+    send(buf);
+}
+
+void WirelessCharging::setWirelessChargingOpenCode(uint8_t* openCode) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x03, openCode[2], openCode[1], openCode[0], 0x00, DATA_FRAME_TAIL};
+    send(buf);
+}
+
+InformationDisplay::InformationDisplay(uint8_t id) : DeviceBase(id) {
+
+}
+
+void InformationDisplay::showSpecifiedPicture(uint8_t id) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x10, 0x00, id, 0x00, 0x00, DATA_FRAME_TAIL};
+    send(buf);
+}
+
+void InformationDisplay::setThePageTurningMode(PageTurningMode pageTurningMode) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x10, static_cast<uint8_t>(pageTurningMode), 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+    send(buf);
+}
+
+void InformationDisplay::showLicensePlate(uint8_t* licensePlate) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x20, licensePlate[5], licensePlate[4], licensePlate[3], 0x00, DATA_FRAME_TAIL};
+    send(buf);
+    uint8_t buf2[] = {DATA_FRAME_HEADER, id, 0x21, licensePlate[2], licensePlate[1], licensePlate[0], 0x00, DATA_FRAME_TAIL};
+    send(buf2);
+}
+
+void InformationDisplay::setTimingMode(InformationDisplayTimingMode timingMode) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x30, static_cast<uint8_t>(timingMode), 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+    send(buf);
+}
+
+void InformationDisplay::showData(uint8_t* data, BaseFormat baseFormat) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, static_cast<uint8_t>(baseFormat), data[2], data[1], data[0], 0x00, DATA_FRAME_TAIL};
+    send(buf);
+}
+
+void InformationDisplay::showTrafficSigns(TrafficSigns trafficSigns) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x60, static_cast<uint8_t>(trafficSigns), 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+    send(buf);
+}
+
+ETC::ETC(uint8_t id) : DeviceBase(id) {
+
+}
+
+void ETC::setInitialPos(bool lUp, bool rUp) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x08, static_cast<uint8_t>(lUp ? 0x01 : 0x02), static_cast<uint8_t>(rUp ? 0x01 : 0x02), 0x00, 0x00, DATA_FRAME_TAIL};
+    send(buf);
+}
+
+StereoscopicDisplay::StereoscopicDisplay(uint8_t id) : DeviceBase(id) {
+
+}
+
 
 K230::K230(uint8_t id) : DeviceBase(id) {
     readBus = 0x6038;
@@ -1084,7 +1174,6 @@ bool Car::acceptTrackFlag() {
 }
 
 
-AlarmDesk alarmDeskA(0x07);
 BarrierGate barrierGateA(0x03);
 BusStop busStopA(0x06);
 Monitor monitorA(0x04);
@@ -1094,7 +1183,14 @@ TrafficLight trafficLightA(0x0E);
 TrafficLight trafficLightB(0x0F);
 TrafficLight trafficLightC(0x13);
 TrafficLight trafficLightD(0x14);
-StreetLamp streetLampA(0xFF);
-K230 k230(0x02);
+WirelessCharging wirelessChargingA(0x0A);
+InformationDisplay informationDisplayA(0x0B);
+InformationDisplay informationDisplayB(0x08);
+InformationDisplay informationDisplayC(0x12);
 
+AlarmDesk alarmDeskA(0x07);
+StreetLamp streetLampA(0xFF);
+StereoscopicDisplay stereoscopicDisplayA(0xFF);
+
+K230 k230(0x02);
 Car car;
