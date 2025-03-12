@@ -6,72 +6,7 @@
 #define ENTOURAGE_CLION_DEVICE_H
 
 #include "def.h"
-
-/***
- * 天气
- */
-enum Weather {
-    /***
-     * 大风
-     */
-    GALE = 0x00,
-
-    /***
-     * 多云
-     */
-    CLOUDY = 0x01,
-
-    /***
-     * 晴
-     */
-    SUNNY = 0x02,
-
-    /***
-     * 小雪
-     */
-    LIGHT_SNOW = 0x03,
-
-    /***
-     * 小雨
-     */
-    SPIT = 0x04,
-
-    /***
-     * 阴天
-     */
-    OVERCAST_SKY = 0x05
-};
-
-/***
- * 文本编码格式
- */
-enum TextEncodingFormat {
-    GB2312 = 0x00,
-    GBK = 0x01,
-    BIG5 = 0x02,
-    Unicode = 0x03,
-};
-
-enum TimingMode {
-    TIMING_OFF = 0x00,
-    TIMING_ON = 0x01,
-    CLOCK_RESET = 0x02,
-};
-
-enum TrafficLightModel {
-    RED = 0x01,
-    GREEN = 0x02,
-    YELLOW = 0x03,
-};
-
-enum K210Color {
-    K_NONE = 0x00,
-    K_WHITE = 0x01,
-    K_BLACK = 0x02,
-    K_RED = 0x03,
-    K_GREEN = 0x04,
-    K_YELLOW = 0x05,
-};
+#include "Enum.h"
 
 void logObj(Weather weather);
 
@@ -298,7 +233,7 @@ public:
 
     /***
     * 将车库移动到指定层
-    * @param level 指定层
+    * @param level 指定层 [1,4]
     */
     void moveToLevel(uint8_t level);
 
@@ -311,7 +246,7 @@ public:
 
     /***
     * 获取车库前后侧红外状态
-    * @param ventral out 前侧
+    * @param ventral out 前侧 (true 表示有东西遮挡)
     * @param rearSide out 后侧
     */
     bool getInfraredState(bool* ventral, bool* rearSide);
@@ -338,11 +273,6 @@ public:
 
 };
 
-enum LightSourceIntensity {
-    ONR = 0x0C,
-    TWO = 0x18,
-    THERE = 0x5E,
-};
 
 /***
  * 路灯
@@ -392,55 +322,6 @@ public:
     void setWirelessChargingOpenCode(uint8_t* openCode);
 };
 
-enum PageTurningMode {
-    UP = 0x01,
-    UNDER = 0x02,
-    AUTOMATIC_PAGE_TURNING = 0x03
-};
-
-enum InformationDisplayTimingMode {
-    OFF = 0x01,
-    NO = 0x02,
-    ZERO = 0x03,
-};
-
-/***
- * 进制格式
- */
-enum BaseFormat {
-    //16
-    F_HEX = 0x40,
-    //10
-    F_DEC = 0x50
-};
-
-enum TrafficSigns {
-    /***
-     *  直行
-     */
-    TurnRun = 0x01,
-    /***
-     *  左转
-     */
-    TurnLeft = 0x02,
-    /***
-     *  右转
-     */
-    TurnRight = 0x03,
-    /***
-     *  掉头
-     */
-    TurnRound = 0x04,
-    /***
-     *  禁止直行
-     */
-    NO_STRAIGHT = 0x05,
-    /***
-     *  禁止通行
-     */
-    NO_ACCESS = 0x06
-};
-
 /***
  * 信息显示物
  */
@@ -481,7 +362,7 @@ public:
      * 显示交通标志
      * @param trafficSigns
      */
-    void showTrafficSigns(TrafficSigns trafficSigns);
+    void showTrafficSigns(TrafficSign trafficSigns);
 
 };
 
@@ -501,11 +382,86 @@ public:
     //TODO 回传接收
 };
 
+
 class StereoscopicDisplay : DeviceBase {
 public:
-
     explicit StereoscopicDisplay(uint8_t id);
 
+
+    /***
+     *
+     * @param licensePlate len = 6
+     * @param x 横坐标
+     * @param y 纵坐标
+     */
+    void showLicensePlate(uint8_t* licensePlate, uint8_t x, uint8_t y);
+
+    /***
+     * 显示距离
+     * @param value 距离
+     */
+    void showDistance(uint8_t value);
+
+
+    /***
+     * 显示"图形"
+     */
+    void showGraphText(Graph graph);
+
+    /***
+     * //设置显示颜色
+     * 显示“颜色”
+     */
+    void showColorText(StereoscopicDisplayColor stereoscopicDisplayColor);
+
+    /***
+     * 交通警示牌
+     */
+    void showTrafficWarningSigns(TrafficWarningSigns trafficWarningSigns);
+
+    /***
+     * 显示交通标识牌
+     */
+    void showTrafficSign(TrafficSign trafficSign);
+
+    /***
+     * 显示默认信息
+     */
+    void showDefaultInformation();
+
+    /***
+     * 设置文字颜色
+     */
+    void setTextColor(uint8_t r, uint8_t g, uint8_t b);
+
+    /***
+     * 显示文字 GBK
+     */
+    void showText(const uint16_t* gbk, uint8_t len);
+
+    void showTextByZigBee(const uint16_t* gbk, uint8_t len);
+
+};
+
+class UltrasonicDevice {
+public:
+
+/***
+ * 超声波测距
+ * @return 测得距离
+ */
+    double ranging(int sys = CM, int rangeFrequency = 5, int wait = 30);
+
+/***
+ * 通过超声波测距控制测距
+ * 该操作会暂停小车
+ * @param carSeep 车速
+ * @param distance 距离
+ * @param errorMargin 允许的误差
+ * @param controlTime_ms 调整时间，如果超过时间无论有没有到指定距离都将退出函数
+ * @return 如果true表示调整到指定距离
+ */
+    void adjustDistance(uint8_t carSeep, uint8_t targetDistance, double errorMargin = 0.2, unsigned long controlTime_ms = 2000, int wait = 30);
 };
 
 struct QrMessage {
@@ -523,9 +479,9 @@ struct QrMessage {
     uint8_t messageLen = 0;
 };
 
+
 class K230 : DeviceBase {
 public:
-
 
     explicit K230(uint8_t id);
 
@@ -541,23 +497,19 @@ public:
     /***
     * 设置寻迹是否开启
     */
-    void setTrackModel(bool open);
+    void setTrackModel(uint8_t model);
+
+    void setTrackModel(const TrackModel trackModel[], uint8_t len);
+
+    uint8_t getTrackModelCache();
 
     /***
      * 获取寻迹标志位
-     * 高八位为靠近中心点
-     * 该函数需要开启寻迹
      *
+     *  @param result len = 6 | nullptr
      * @return
      */
-    bool getTrackFlagBit(uint8_t* trackFlagBitHigh, uint8_t* trackFlagBitLow);
-
-    /***
-     * 16版本
-     * @param flagBitHigh
-     * @return
-     */
-    bool getTrackFlagBit(uint16_t* flagBitHigh);
+    bool getTrackFlagBit(uint8_t* result);
 
     /***
      *
@@ -591,18 +543,33 @@ public:
     //void loop();
 
 private:
+    uint8_t trackModel;
     bool receiveTrack;
     int8_t cameraSteeringGearAngle;
 };
 
-struct TrackResult {
-    uint8_t flagBitArray[2] = {};
+struct TrackRowResult {
+    uint8_t* flagBitArray;
     uint16_t flagBit;
     float offset;
     uint8_t bitCount;
     uint8_t centerBitCount;
     uint8_t edgeBitCount;
+};
 
+struct TrackResult {
+    uint8_t flagBitArray[6] = {};
+    TrackRowResult trackRowResultHigh{};
+    TrackRowResult trackRowResult{};
+    TrackRowResult trackRowResultLow{};
+};
+
+
+class MainCar : DeviceBase {
+public:
+    explicit MainCar(uint8_t id);
+
+    bool awaitReturn(uint8_t buf[], uint8_t serviceId);
 };
 
 /***
@@ -635,7 +602,17 @@ public:
  * 直行到下一个路口
  * @param carSpeed
  */
-    void trackAdvance();
+    void trackAdvanceToNextJunction();
+
+    /***
+     * 直行到下一个路口
+     */
+    void advanceToNextJunction();
+
+    /***
+     * 倒车寻迹到下一个路口
+     */
+    void recoilToNextJunction();
 
     /***
      * 前进一段距离
@@ -653,18 +630,29 @@ public:
 
     void trackTurnRight(bool trimCar = true);
 
-    void turnLeft(bool trimCar);
+    void turnLeft(bool trimCar = true);
 
-    void turnRight(bool trimCar);
+    void turnRight(bool trimCar = true);
 
     /***
      * 微调车姿态
      */
     void trimCar();
 
+    /***
+     * 矫正车身，与寻迹线平行
+     */
+    void rightCar();
+
     void mobileCorrection(uint16_t step);
 
     bool acceptTrackFlag();
+
+
+/***
+ * led闪烁
+ */
+    void ledShine(int number, int wait);
 
     int16_t straightLineSpeed;
     int16_t turnLeftSpeed;
@@ -672,20 +660,11 @@ public:
     int16_t straightLineKpSpeed;
     int16_t trimKpSpeed;
 
-    // PID 控制参数（车体校正时用的）——作为类成员便于调试和参数调整
-    float _trimAttitudeKpSpeed{};  // 比例系数
-    float _trimAttitudeKiSpeed{};  // 积分系数
-    float _trimAttitudeKdSpeed{};  // 微分系数
-
     unsigned long trimOutTime_ms;
     unsigned long outTime_ms;
 
 
 private:
-    // PID 状态变量：用于跨循环累积（每次 trimCar 调用开始时会重置）
-    float pid_integral{};
-    float lastError{};
-
     TrackResult trackResult{};
 
     void rotationProcess();
@@ -694,8 +673,9 @@ private:
      * 等待码盘
      * @param 等待码盘的变化量达到指定值(不检测正反)
      */
-    void waitCodeDisc(uint16_t distance);
+    void waitCodeDisc(int16_t distance);
 
+    void acceptTrackRowFlag(TrackRowResult* trackRowResult);
 };
 
 
@@ -741,7 +721,7 @@ extern InformationDisplay informationDisplayA;
 extern InformationDisplay informationDisplayB;
 extern InformationDisplay informationDisplayC;
 
-//===============红外========
+//===============红外==============
 
 /***
  * 报警台
@@ -756,7 +736,11 @@ extern StreetLamp streetLampA;
 /***
  * 立体显示物
  */
-extern StereoscopicDisplay stereoscopicDisplay;
+extern StereoscopicDisplay stereoscopicDisplayA;
+//==============other==============
+
+extern UltrasonicDevice ultrasonicDevice;
+
 
 /***
  * 摄像头
@@ -767,5 +751,6 @@ extern K230 k230;
  */
 extern Car car;
 
+extern MainCar mainCar;
 
 #endif //ENTOURAGE_CLION_DEVICE_H

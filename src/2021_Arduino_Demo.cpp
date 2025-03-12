@@ -196,19 +196,11 @@ void TaskMain::loop() {
 }
 
 void TaskCar::setup() {
-    k230.setTrackModel(true);
 }
 
 void TaskCar::loop() {
-
-    /*if (k230.ping()) {
-        carLight.RightTurnOn();
-        carLight.LeftTurnOn();
-    }
-    sleep(1000);
-    carLight.RightTurnOff();
-    carLight.LeftTurnOff();
-    sleep(1000);*/
+    //uint8_t buf[8] = {};
+    //mainCar.awaitReturn(buf, 0x01);
 }
 
 
@@ -219,81 +211,96 @@ void KEY_Handler(uint8_t k_value) {
     Serial.println();
 #endif
 
+    K210Color k210Color;
+    uint8_t count;
+
+    uint8_t level;
+
+    bool ventral;
+    bool rearSide;
+
+    uint8_t data[] = {DATA_FRAME_HEADER, 0x01, 0x01, 0x02, 0x03, 0x04, 0x00, DATA_FRAME_TAIL};
+    uint32_t com = 0;
+    for (uint8_t i = 2; i < 8 - 2; i++) {
+        com += data[i];
+    }
+    data[8 - 2] = static_cast<int8_t>(com % 256);
+
+    uint8_t str[] = "A12345";
+    uint16_t gbk[] = {0x86CB, 0x86CB, 0x86CB, 0x86CB, 0x86CB, 0x86CB, 0x86CB, 0x86CB, 0x86CB, 0x86CB, 0x86CB, 0x86CB,};
+
     switch (k_value) {
         case 0x01:
-            //k230.setTrackModel(false);
-            //k230.setCameraSteeringGearAngle(0);
-            //k230.qrRecognize(&count, qrMessageArray, 4);
+            //stereoscopicDisplayA.showText(gbk, 12);
+            carTest.figureEightCycle();
 
-            k230.setCameraSteeringGearAngle(-55);
-            k230.setTrackModel(true);
-
-
-            k230.setTrackModel(false);
-
+            //car.advance(300);
             break;
         case 0x02:
-            //k230.setTrackModel(false);
-            //k230.setCameraSteeringGearAngle(0);
-            //k230.trafficLightRecognize(&k210Color);
-
-
-            //DCMotor.SpeedCtr(50, 50);
-
-            //k230.setCameraSteeringGearAngle(-55);
-            //k230.setTrackModel(true);
-            //car.trimCar(60, 10000);
-            //k230.setTrackModel(false);
-            k230.setCameraSteeringGearAngle(-55);
-            k230.setTrackModel(true);
-            for (int i = 0; i < 100; ++i) {
-                car.trackAdvance();
-                car.trackTurnLeft();
-                //car.turnLeft(false);
-                //car.recoil(300);
-                //car.mobileCorrection(200);
-                //car.trimCar();
-
-                car.trackAdvance();
-                car.trackTurnLeft();
-                car.trackAdvance();
-                car.trackTurnLeft();
-                car.trackAdvance();
-                car.trackTurnLeft();
-
-                car.trackAdvance();
-                car.trackTurnRight();
-                car.trackAdvance();
-                car.trackTurnRight();
-                car.trackAdvance();
-                car.trackTurnRight();
-                car.trackAdvance();
-                car.trackTurnRight();
-            }
-            k230.setTrackModel(false);
-
+            carTest.rightCarTest();
             break;
         case 0x03:
+
+
             k230.setCameraSteeringGearAngle(-55);
-            k230.setTrackModel(true);
-            car.trimCar();
-            k230.setTrackModel(false);
+            k230.setTrackModel(TRACK_MIDDLE);
+            carportA.moveToLevel(1);
+
+            car.mobileCorrection(200);
+
+            k230.setTrackModel(0);
+
+            while (true) {
+                if (carportA.getLevel(&level)) {
+                    if (level == 1) {
+                        break;
+                    }
+                }
+            }
+
+            DCMotor.SpeedCtr(-20, -20);
+
+
+            while (true) {
+                if (carportA.getInfraredState(&ventral, &rearSide)) {
+                    if (ventral) {
+                        break;
+                    }
+                }
+            }
+
+            while (true) {
+                if (carportA.getInfraredState(&ventral, &rearSide)) {
+                    if (!ventral || rearSide) {
+                        break;
+                    }
+                }
+            }
+
+            DCMotor.Stop();
+
+            carportA.moveToLevel(3);
 
             break;
         case 0x04:
             /* car.getCodeDisc();
              car.clearCodeDisc();
              car.getCodeDisc();*/
+            /* k230.setCameraSteeringGearAngle(-55);
+             k230.setTrackModel(TRACK_MIDDLE);
+             car.mobileCorrection(200);
+             k230.setTrackModel(0);*/
+
+
+
+            //ExtSRAMInterface.ExMem_Write_Bytes(0x6008, data, 8);
             k230.setCameraSteeringGearAngle(-55);
-            k230.setTrackModel(true);
-            car.mobileCorrection(200);
+            k230.setTrackModel(TRACK_MIDDLE);
+            car.trimCar();
             k230.setTrackModel(false);
             break;
     }
 }
-
-String DecIntToHexStr(long long num) {}
-
 
 void Beep_time3() {
     CoreBeep.Initialization();

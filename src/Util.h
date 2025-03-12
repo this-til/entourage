@@ -15,6 +15,10 @@ void logHex(uint8_t p);
 
 void logHex(const uint8_t* p, uint16_t len);
 
+void logBool(bool b);
+
+void logBin(uint8_t data);
+
 uint32_t countBits(const uint8_t* value, uint32_t len);
 
 /***

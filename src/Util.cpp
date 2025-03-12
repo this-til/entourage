@@ -17,6 +17,24 @@ void logHex(const uint8_t* p, uint16_t len) {
     }
 }
 
+void logBool(bool b) {
+    if (b) {
+        Serial.print("true");
+    } else {
+        Serial.print("false");
+    }
+}
+
+void logBin(uint8_t data) {
+    for (int i = 7; i >= 0; --i) {
+        if ((data >> i) & 0x01) {
+            Serial.print("1");
+        } else {
+            Serial.print("0");
+        }
+    }
+}
+
 void logObj(Weather weather) {
     switch (weather) {
         case GALE :
