@@ -11,9 +11,11 @@ void l_setup();
 
 void l_loop();
 
-void KEY_Handler(uint8_t k_value);
-// 处理按键的函数，参数为按键值
-
+/***
+ * 处理按键的函数，参数为按键值
+ * @param k_value
+ */
+void keyHandler(uint8_t k_value);
 
 
 #endif //ENTOURAGE_CLION_2021_ARDUINO_DEMO_H

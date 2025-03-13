@@ -60,7 +60,6 @@ void logObj(Weather weather) {
 }
 
 void logObj(TextEncodingFormat textEncodingFormat) {
-#if DE_BUG
     switch (textEncodingFormat) {
         case GB2312:
             Serial.print("GB2312");
@@ -76,11 +75,9 @@ void logObj(TextEncodingFormat textEncodingFormat) {
             return;
     }
     Serial.print("NULL");
-#endif
 }
 
 void logObj(TimingMode timingMode) {
-#if DE_BUG
     switch (timingMode) {
         case TIMING_OFF :
             Serial.print("TIMING_OFF");
@@ -93,11 +90,9 @@ void logObj(TimingMode timingMode) {
             return;
     }
     Serial.print("NULL");
-#endif
 }
 
 void logObj(TrafficLightModel trafficLightModel) {
-#if DE_BUG
     switch (trafficLightModel) {
         case RED:
             Serial.print("RED");
@@ -110,11 +105,9 @@ void logObj(TrafficLightModel trafficLightModel) {
             return;
     }
     Serial.print("NULL");
-#endif
 }
 
 void logObj(K210Color k210Color) {
-#if DE_BUG
     switch (k210Color) {
         case K_NONE:
             Serial.print("NONE");
@@ -136,7 +129,6 @@ void logObj(K210Color k210Color) {
             return;
     }
     Serial.print("NULL");
-#endif
 }
 
 

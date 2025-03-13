@@ -328,7 +328,7 @@ RECTANGLES_HIGH_LOW = []
 # RECTANGLES = HIGH_RECTANGLES + LOW_RECTANGLES
 # RECTANGLES_ROTATIONAL_TIME = HIGH_RECTANGLES + LOW_RECTANGLES_ROTATIONAL_TIME
 
-LINE_COLOR_THRESHOLD = [(0, 45)]
+LINE_COLOR_THRESHOLD = [(0, 40)]
 
 
 def initTrack():
@@ -513,7 +513,7 @@ def qrRecognize(img, outImg=None, sendRecognize=True):
                 color = (0, 255, 0)
             if colorId == YELLOW:
                 color = (255, 255, 0)
-            img.draw_rectangle(qr.rect())
+            img.draw_rectangle(qr.rect(), color=color)
             x, y, w, h = qr.rect()
             img.draw_string(
                 x,
@@ -735,7 +735,9 @@ if __name__ == '__main__':
             if openTrack != 0:
                 track(primitiveImg, img, True)
 
-            drawLogs(img)
+            # drawLogs(img)
+
+            qrRecognize()
 
             lcd.display(img)
         except Exception as err:

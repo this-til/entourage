@@ -5,54 +5,158 @@
 #ifndef ENTOURAGE_CLION_DEVICE_H
 #define ENTOURAGE_CLION_DEVICE_H
 
+
+#define DETECTED_VALUE_CHANGE(name)                                                                                     \
+unsigned long startTime = millis();                                                                                     \
+uint8_t name##Version = this->name##Version;                                                                            \
+while (millis() - startTime < 1000) {                                                                                   \
+    if(name##Version != this->name##Version) {                                                                          \
+        if ((name) != nullptr) {                                                                                        \
+            *(name) = this->name;                                                                                       \
+        }                                                                                                               \
+        return true;                                                                                                    \
+    }                                                                                                                   \
+    yield();                                                                                                            \
+}                                                                                                                       \
+return false;                                                                                                           \
+
+#define TWO_DETECTED_VALUE_CHANGE(name1, name2)                                                                         \
+unsigned long startTime = millis();                                                                                     \
+uint8_t name1##_##name2##Version = this->name1##_##name2##Version;                                                      \
+while (millis() - startTime < 1000) {                                                                                   \
+    if(name1##_##name2##Version != this->name1##_##name2##Version) {                                                    \
+        if ((name1) != nullptr) {                                                                                       \
+            *(name1) = this->name1;                                                                                     \
+        }                                                                                                               \
+        if ((name2) != nullptr) {                                                                                       \
+            *(name2) = this->name2;                                                                                     \
+        }                                                                                                               \
+        return true;                                                                                                    \
+    }                                                                                                                   \
+    yield();                                                                                                            \
+}                                                                                                                       \
+return false;                                                                                                           \
+
+#define THERE_DETECTED_VALUE_CHANGE(name1, name2, name3)                                                                \
+unsigned long startTime = millis();                                                                                     \
+    uint8_t name1##_##name2##_##name3##Version = this->name1##_##name2##_##name3##Version;                              \
+    while (millis() - startTime < 1000) {                                                                               \
+    if(name1##_##name2##_##name3##Version != this->name1##_##name2##_##name3##Version) {                                \
+        if ((name1) != nullptr) {                                                                                       \
+            *(name1) = this->name1;                                                                                     \
+        }                                                                                                               \
+        if ((name2) != nullptr) {                                                                                       \
+            *(name2) = this->name2;                                                                                     \
+        }                                                                                                               \
+        if ((name3) != nullptr) {                                                                                       \
+            *(name3) = this->name3;                                                                                     \
+        }                                                                                                               \
+        return true;                                                                                                    \
+    }                                                                                                                   \
+    yield();                                                                                                            \
+}                                                                                                                       \
+return false;                                                                                                           \
+
+
+#define UPDATE_VALUE(conditions, name, value)                                                                           \
+if (conditions) {                                                                                                       \
+    (name)=(value);                                                                                                     \
+    name##Version++;                                                                                                    \
+}                                                                                                                       \
+
+#define TWO_UPDATE_VALUE(conditions, name1, value1, name2, value2)                                                      \
+if (conditions) {                                                                                                       \
+    (name1)=(value1);                                                                                                   \
+    (name2)=(value2);                                                                                                   \
+    name1##_##name2##Version++;                                                                                         \
+}                                                                                                                       \
+
+
+#define THERE_UPDATE_VALUE(conditions, name1, value1, name2, value2, name3, value3)                                     \
+if (conditions) {                                                                                                       \
+    (name1)=(value1);                                                                                                   \
+    (name2)=(value2);                                                                                                   \
+    (name3)=(value3);                                                                                                   \
+    name1##_##name2##_##name3##Version++;                                                                               \
+}                                                                                                                       \
+
+
+#define VALUE_VERSION(type, name)                                                                                       \
+type name;                                                                                                              \
+uint8_t name##Version;                                                                                                  \
+
+#define TWO_VALUE_VERSION(type1, name1, type2, name2)                                                                   \
+type1 name1;                                                                                                            \
+type2 name2;                                                                                                            \
+uint8_t name1##_##name2##Version;                                                                                       \
+
+#define THERE_VALUE_VERSION(type1, name1, type2, name2, type3, name3)                                                   \
+type1 name1;                                                                                                            \
+type2 name2;                                                                                                            \
+type3 name3;                                                                                                            \
+uint8_t name1##_##name2##_##name3##Version;                                                                             \
+
+
 #include "def.h"
 #include "Enum.h"
+#include "Cache.h"
 
-void logObj(Weather weather);
 
-void logObj(TextEncodingFormat textEncodingFormat);
+void logObj(enum Weather weather);
 
-void logObj(TimingMode timingMode);
+void logObj(enum TextEncodingFormat textEncodingFormat);
 
-void logObj(TrafficLightModel trafficLightModel);
+void logObj(enum TimingMode timingMode);
 
-void logObj(K210Color k210Color);
+void logObj(enum TrafficLightModel trafficLightModel);
+
+void logObj(enum K210Color k210Color);
+
+void deviceSetup();
+
+class MessageBus {
+public:
+    uint8_t computeVerify(const uint8_t* buf, uint8_t len);
+
+    void addVerify(uint8_t* buf, uint8_t len);
+
+    void send(uint8_t* buf, uint8_t len, uint16_t bus = 0x6008, bool addVerify = true, unsigned long sendCoolingMs = 300);
+
+    bool check(const uint8_t* buf, uint8_t len, uint8_t id, const uint8_t* serviceId, uint8_t serviceLen, bool verify = true);
+
+    bool check(const uint8_t* buf, uint8_t len, uint8_t id, uint8_t serviceId, bool verify = true);
+
+    bool awaitReturn(uint8_t* buf, uint8_t len, uint8_t id, const uint8_t* serviceId, uint8_t serviceLen, uint16_t bus = 0x6008, bool verify = true, unsigned long readOutTimeMs = 1000);
+
+    bool awaitReturn(uint8_t* buf, uint8_t len, uint8_t id, uint8_t serviceId, uint16_t bus = 0x6008, bool verify = true, unsigned long readOutTimeMs = 1000);
+
+protected:
+    unsigned long lastSentTime = 0;
+};
 
 class DeviceBase {
 public:
     explicit DeviceBase(uint8_t id);
 
-    void send(uint8_t* buf);
+    /***
+     * 当受到zigbee消息，并且帧头id==设备id
+     * @param buf
+     */
+    virtual void onReceiveZigbeeMessage(uint8_t buf[]);
 
-    bool check(const uint8_t* buf, const uint8_t* serviceId, uint8_t serviceLen);
-
-    bool awaitReturn(uint8_t buf[], const uint8_t* serviceId, uint8_t serviceLen);
-
-    bool check(const uint8_t* buf, uint8_t serviceId);
-
-    bool awaitReturn(uint8_t buf[], uint8_t serviceId);
-
-protected:
     uint8_t id;
-
-    uint16_t sendBus;
-    uint8_t sendLen;
-    bool sendVerify;
-    int32_t sendCooling_ms;
-
-    uint16_t readBus;
-    uint8_t readLen;
-    bool readVerify;
-    bool readTailIntegrity;
-    bool readHeadIntegrity;
-    unsigned long readOutTime_ms;
 };
 
 /***
  * 报警台
  */
-class AlarmDesk : DeviceBase {
+class AlarmDesk : public DeviceBase {
 public:
+
+    VALUE_VERSION(uint8_t, rescuePosition)
+
+    void onReceiveZigbeeMessage(uint8_t* buf) override;
+
     explicit AlarmDesk(uint8_t id);
 
     /***
@@ -63,22 +167,19 @@ public:
     /***
      * 获取救援位置
      */
-    uint8_t getRescuePosition();
+    bool getRescuePosition(uint8_t* rescuePosition);
 
-    /***
-     * debug
-     * 设置开启码
-     * @param data[] len=6
-     */
-    void setOpenCode(uint8_t data[]);
-
+    void setOpenCode(uint8_t* data);
 };
 
 /***
  * 智能道闸标控制
  */
-class BarrierGate : DeviceBase {
+class BarrierGate : public DeviceBase {
 public:
+    VALUE_VERSION(bool, gateControl)
+
+
     explicit BarrierGate(uint8_t id);
 
     /***
@@ -113,8 +214,12 @@ public:
 /***
  * 公交站
  */
-class BusStop : DeviceBase {
+class BusStop : public DeviceBase {
 public:
+    THERE_VALUE_VERSION(uint8_t, yy, uint8_t, MM, uint8_t, dd)
+    THERE_VALUE_VERSION(uint8_t, HH, uint8_t, mm, uint8_t, ss)
+    TWO_VALUE_VERSION(Weather, weather, uint8_t, temperature)
+
     explicit BusStop(uint8_t id);
 
     /***
@@ -192,13 +297,15 @@ public:
        */
     void recoverSynthesizingLanguage();
 
+    void onReceiveZigbeeMessage(uint8_t* buf) override;
+
 };
 
 
 /***
  *  智能显示标志物控制
  */
-class Monitor : DeviceBase {
+class Monitor : public DeviceBase {
 public:
     explicit Monitor(int id);
 
@@ -225,9 +332,12 @@ public:
 /***
  * 智能立体车库
  */
-class Carport : DeviceBase {
+class Carport : public DeviceBase {
 
 public:
+
+    VALUE_VERSION(uint8_t, level)
+    TWO_VALUE_VERSION(bool, ventral, bool, rearSide)
 
     explicit Carport(uint8_t id);
 
@@ -251,13 +361,15 @@ public:
     */
     bool getInfraredState(bool* ventral, bool* rearSide);
 
+    void onReceiveZigbeeMessage(uint8_t* buf) override;
+
 
 };
 
 /***
  * 智能交通信号灯
  */
-class TrafficLight : DeviceBase {
+class TrafficLight : public DeviceBase {
 public:
     explicit TrafficLight(uint8_t id);
 
@@ -277,7 +389,7 @@ public:
 /***
  * 路灯
  */
-class StreetLamp : DeviceBase {
+class StreetLamp : public DeviceBase {
 public:
     explicit StreetLamp(uint8_t id);
 
@@ -286,17 +398,11 @@ public:
     void setLightSourceIntensity(LightSourceIntensity lightSourceIntensity);
 };
 
-/***
- * 信息显示物(广告牌)
- */
-class AdvertisingBoard : DeviceBase {
-    explicit AdvertisingBoard(uint8_t id);
-};
 
 /***
  * 无线充电
  */
-class WirelessCharging : DeviceBase {
+class WirelessCharging : public DeviceBase {
 public:
     explicit WirelessCharging(uint8_t id);
 
@@ -325,7 +431,7 @@ public:
 /***
  * 信息显示物
  */
-class InformationDisplay : DeviceBase {
+class InformationDisplay : public DeviceBase {
 public:
     explicit InformationDisplay(uint8_t id);
 
@@ -366,7 +472,7 @@ public:
 
 };
 
-class ETC : DeviceBase {
+class ETC : public DeviceBase {
 
 public:
     explicit ETC(uint8_t id);
@@ -383,7 +489,7 @@ public:
 };
 
 
-class StereoscopicDisplay : DeviceBase {
+class StereoscopicDisplay : public DeviceBase {
 public:
     explicit StereoscopicDisplay(uint8_t id);
 
@@ -465,18 +571,19 @@ public:
 };
 
 struct QrMessage {
-    bool efficient;
-
-    K210Color qrColor = K_WHITE;
 
     /***
-     * 二维码信息容器
-     */
-    uint8_t* message;
+ * 二维码信息容器
+ */
+    uint8_t* message{};
 
     uint8_t messageMaxLen = 0;
 
     uint8_t messageLen = 0;
+
+    bool efficient{};
+
+    K210Color qrColor = K_WHITE;
 };
 
 
@@ -543,9 +650,53 @@ public:
     //void loop();
 
 private:
-    uint8_t trackModel;
+    uint8_t trackModel{};
     bool receiveTrack;
-    int8_t cameraSteeringGearAngle;
+    int8_t cameraSteeringGearAngle{};
+};
+
+
+class MainCar : public DeviceBase {
+public:
+    explicit MainCar(uint8_t id);
+
+    /***
+     * 自动同步一个全局数据
+     * @param name [0,25] U [a,z]
+     * @param value
+     */
+    bool synchronousGlobalVariable(uint8_t name, uint16_t value);
+
+    uint16_t getGlobalVariable(uint8_t name);
+
+    void synchronizationTaskCompletion(uint8_t taskId);
+
+    /***
+     * 发送二维码识别的车牌号
+     * @param data len = 6
+     */
+    void sendQr1LicensePlateNumber(uint8_t data[]);
+
+    /***
+     * 发送车库A的初始层级
+     * @param level
+     */
+    void sendCarportALevel(uint8_t level);
+
+    void sendQr2CalculationResult(uint8_t result);
+
+    void onReceiveZigbeeMessage(uint8_t* buf) override;
+
+
+//==========全局变量=========
+
+/***
+ * 开始位置
+ */
+    uint8_t startPos = 0;
+    uint16_t globalVariable[26] = {};
+    uint8_t globalVariableReturnCount = 0;
+    boolean taskCompletion[20] = {};
 };
 
 struct TrackRowResult {
@@ -557,28 +708,13 @@ struct TrackRowResult {
     uint8_t edgeBitCount;
 };
 
-struct TrackResult {
-    uint8_t flagBitArray[6] = {};
-    TrackRowResult trackRowResultHigh{};
-    TrackRowResult trackRowResult{};
-    TrackRowResult trackRowResultLow{};
-};
-
-
-class MainCar : DeviceBase {
-public:
-    explicit MainCar(uint8_t id);
-
-    bool awaitReturn(uint8_t buf[], uint8_t serviceId);
-};
-
 /***
  * 你的小车车
  * 一些和车有关的，杂七杂八的就扔在这里
  */
-class Car {
+class Car : public DeviceBase {
 public:
-    Car();
+    explicit Car(uint8_t id);
 
     void carSleep(uint16_t time);
 
@@ -610,6 +746,14 @@ public:
     void advanceToNextJunction();
 
     /***
+     * 通过特殊地形
+     * 然后调用advanceToNextJunction
+     *
+     * @param forkInto 表示是从岔路进入的特殊地形
+     */
+    void overspecificRelief();
+
+    /***
      * 倒车寻迹到下一个路口
      */
     void recoilToNextJunction();
@@ -639,11 +783,23 @@ public:
      */
     void trimCar();
 
+    void trimCar(TrackRowResult* trackRowResult, float offset);
+
     /***
      * 矫正车身，与寻迹线平行
      */
     void rightCar();
 
+    /***
+     * 前进式调整
+     * @param step
+     */
+    void advanceCorrection(uint16_t step, uint8_t maximumFrequency);
+
+    /***
+     * 来回式调整
+     * @param step
+     */
     void mobileCorrection(uint16_t step);
 
     bool acceptTrackFlag();
@@ -653,6 +809,8 @@ public:
  * led闪烁
  */
     void ledShine(int number, int wait);
+
+    void onReceiveZigbeeMessage(uint8_t* buf) override;
 
     int16_t straightLineSpeed;
     int16_t turnLeftSpeed;
@@ -665,19 +823,25 @@ public:
 
 
 private:
-    TrackResult trackResult{};
+    uint8_t flagBitArray[6] = {};
+    TrackRowResult trackRowResultHigh{};
+    TrackRowResult trackRowResult{};
+    TrackRowResult trackRowResultLow{};
 
     void rotationProcess();
 
     /***
      * 等待码盘
-     * @param 等待码盘的变化量达到指定值(不检测正反)
+     * @param distance 等待码盘的变化量达到指定值
      */
     void waitCodeDisc(int16_t distance);
 
     void acceptTrackRowFlag(TrackRowResult* trackRowResult);
 };
 
+extern DeviceBase* allDeviceBase[256];
+
+extern MessageBus messageBus;
 
 /***
  * 智能道闸标控制
@@ -741,7 +905,6 @@ extern StereoscopicDisplay stereoscopicDisplayA;
 
 extern UltrasonicDevice ultrasonicDevice;
 
-
 /***
  * 摄像头
  */
@@ -753,4 +916,10 @@ extern Car car;
 
 extern MainCar mainCar;
 
+//==============总览==============
+
+
+
 #endif //ENTOURAGE_CLION_DEVICE_H
+
+

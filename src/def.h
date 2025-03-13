@@ -3,7 +3,7 @@
 //
 
 
-#define DE_BUG false
+#define DE_BUG true
 /*
 #define LOG_LEVEL 4  // 0=OFF,1=ERROR,2=WARN,3=INFO,4=DEBUG
 
@@ -37,6 +37,7 @@
 #include "Util.h"
 #include "Enum.h"
 #include "Test.h"
+#include "Cache.h"
 
 // 标准无符号类型
 #define uchar  unsigned char

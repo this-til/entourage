@@ -20,8 +20,20 @@ public:
     void mobileCorrectionTest();
 
     void rightCarTest();
+
+    void advanceCorrectionTest();
+};
+
+
+class K230Test {
+public:
+    void qrRecognizeTest();
+
+    K230Test();
 };
 
 extern CarTest carTest;
+
+extern K230Test k230Test;
 
 #endif //ENTOURAGE_CLION_TEST_H
