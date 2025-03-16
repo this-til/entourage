@@ -217,4 +217,27 @@ enum TrackModel {
     TRACK_HIGH = 1 << 2
 };
 
+enum Direction {
+    /***
+     * 上 y--
+     */
+    D_UP = 0x01,
+
+    /***
+     * 下 y++
+     */
+    D_UNDER = 0x02,
+
+    /***
+     * 左 x--
+     */
+    D_LEFT = 0x03,
+
+    /***
+     * 右 x++
+     */
+    D_RIGHT = 0x04,
+
+};
+
 #endif //ENTOURAGE_CLION_ENUM_H

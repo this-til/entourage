@@ -737,7 +737,7 @@ if __name__ == '__main__':
 
             # drawLogs(img)
 
-            qrRecognize()
+            # qrRecognize()
 
             lcd.display(img)
         except Exception as err:

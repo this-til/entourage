@@ -156,6 +156,19 @@ bool MessageBus::awaitReturn(uint8_t* buf, uint8_t len, uint8_t id, uint8_t serv
     return awaitReturn(buf, len, id, &serviceId, 1, bus, verify, readOutTimeMs);
 }
 
+bool MessageBus::sendAndWait(uint8_t* buf, uint8_t len, const uint8_t* returnCount, uint16_t bus, bool addVerify, unsigned long sendCoolingMs, unsigned long maxWaitingTimeMs) {
+    const uint8_t initialCount = *returnCount;
+    const unsigned long startTime = millis();
+    while (millis() - startTime < 5000) {
+        send(buf, len, bus, addVerify, sendCoolingMs);
+        sleep(sendCoolingMs);
+        if (initialCount != *returnCount) {
+            return true;
+        }
+    }
+    return false;
+}
+
 
 DeviceBase::DeviceBase(uint8_t id) {
     this->id = id;
@@ -756,7 +769,7 @@ bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen
 
 #if DE_BUG
         Serial.print("receive qr color:");
-        logHex(K210Color(qrRecognizeBuf[6]));
+        logObj(K210Color(qrRecognizeBuf[6]));
         Serial.println();
 #endif
 
@@ -915,13 +928,23 @@ void Car::onReceiveZigbeeMessage(uint8_t* buf) {
     Serial.println("[DEBUG] onReceiveZigbeeMessage from car:");
 #endif
 
-    uint8_t _buf[] = {DATA_FRAME_HEADER, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+    uint8_t _buf[] = {DATA_FRAME_HEADER, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+
+    uint8_t name = 0;
 
     switch (buf[2]) {
         case 0x01: //同步全局变量
-            mainCar.globalVariable[buf[3]] = buf[4] << 8 | buf[5];
+            name = buf[3];
+            netSynchronization.globalVariable[name] = buf[4] << 8 | buf[5];
 #if DE_BUG
-            Serial.print("[DEBUG] synchronousGlobalVariable:");
+            Serial.print("[DEBUG] synchronousGlobalVariable...");
+            Serial.print("  name:");
+            logHex(name);
+            Serial.print("  value:");
+            Serial.print(netSynchronization.globalVariable[buf[3]]);
+            Serial.print("  value(HEX):");
+            logHex(buf + 4, 2);
+            Serial.println();
 #endif
             _buf[2] = ~0x01;
             _buf[3] = buf[3];
@@ -929,91 +952,227 @@ void Car::onReceiveZigbeeMessage(uint8_t* buf) {
             _buf[5] = buf[5];
             messageBus.send(_buf, 8);
             break;
-        case 0xFE:
-            mainCar.globalVariableReturnCount++;
+        case 0xFE: //~0x01
+            netSynchronization.globalVariableReturnCount++;
 #if DE_BUG
             Serial.print("[DEBUG] globalVariableReturnCount:");
-            Serial.print(mainCar.globalVariableReturnCount);
+            Serial.print(netSynchronization.globalVariableReturnCount);
             Serial.println();
 #endif
             break;
-        case 0x02:
-            mainCar.taskCompletion[buf[3]] = true;
+#if FOR_THE_KING_HEN
+        case 0x21:
+#if DE_BUG
+            Serial.print("[DEBUG] synchronousLicensePlateNumber high...");
+            Serial.print("  data:");
+            logHex(buf + 3, 3);
+            Serial.println();
+#endif
+            _buf[2] = ~0x21;
+            _buf[3] = buf[3];
+            _buf[4] = buf[4];
+            _buf[5] = buf[5];
+            messageBus.send(_buf, 8);
             break;
-        case 0x81: //起始位置 (b车启动) A车任务6（RFID读取） → 发送路径信息 → B车任务8/11
-            mainCar.startPos = buf[3];
+        case 0xDE://~0x21
+            netSynchronization.licensePlateNumberHighReturnCount++;
+#if DE_BUG
+            Serial.print("[DEBUG] licensePlateNumberHighReturnCount:");
+            Serial.print(netSynchronization.licensePlateNumberHighReturnCount);
+            Serial.println();
+#endif
             break;
-    }
+        case 0x22:
 
+#if DE_BUG
+            Serial.print("[DEBUG] synchronousLicensePlateNumber low...");
+            Serial.print("  data:");
+            logHex(buf + 3, 3);
+            Serial.println();
+#endif
+            _buf[2] = ~0x22;
+            _buf[3] = buf[3];
+            _buf[4] = buf[4];
+            _buf[5] = buf[5];
+            messageBus.send(_buf, 8);
+            break;
+        case 0xDD://~0x22
+            netSynchronization.licensePlateNumberLowReturnCount++;
+#if DE_BUG
+            Serial.print("[DEBUG] licensePlateNumberLowReturnCount:");
+            Serial.print(netSynchronization.licensePlateNumberLowReturnCount);
+            Serial.println();
+            break;
+#endif
+    }
+#endif
 }
 
 
-bool MainCar::synchronousGlobalVariable(uint8_t name, uint16_t value) {
-    name = name > 25 ? name - 'a' : name;
-    globalVariable[name] = value;
-    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x01, name, (uint8_t) (value >> 8), (uint8_t) (value), 0x00, DATA_FRAME_TAIL};
+bool NetSynchronization::synchronousGlobalVariable(uint8_t name, uint16_t value) {
+    netSynchronization.globalVariable[name] = value;
 
-    uint8_t globalVariableReturnCount = this->globalVariableReturnCount;
-    unsigned long startTime = millis();
-    while (millis() - startTime < 5000) {
-        messageBus.send(buf, 8);
-        if (globalVariableReturnCount != this->globalVariableReturnCount) {
 #if DE_BUG
-            Serial.println("[DEBUG] synchronousGlobalVariable successful...");
+    Serial.print("[DEBUG] synchronousGlobalVariable...");
+    Serial.print("  name:");
+    Serial.print(name);
+    Serial.print("  value:");
+    Serial.print(value);
+    Serial.print("  value(HEX):");
+    uint8_t bufLog[] = {(uint8_t) (value >> 8), (uint8_t) value};
+    logHex(bufLog, 2);
+    Serial.println();
 #endif
-            return true;
+
+    uint8_t buf[] = {DATA_FRAME_HEADER, 0x01, 0x01, name, (uint8_t) (value >> 8), (uint8_t) (value), 0x00, DATA_FRAME_TAIL};
+
+    bool s = messageBus.sendAndWait(buf, 8, &globalVariableReturnCount);
+
+#if DE_BUG
+    Serial.print("[DEBUG] synchronousGlobalVariable");
+    Serial.print(s ? "successful" : "outTime");
+    Serial.print("...");
+    Serial.println();
+#endif
+    return s;
+}
+
+bool NetSynchronization::synchronousGlobalVariable(uint8_t name, uint16_t* value, uint8_t len) {
+
+#if DE_BUG
+    Serial.print("[DEBUG] synchronousGlobalVariables...");
+    Serial.print("  originAddress:");
+    Serial.print(name);
+    Serial.print("  value:");
+    logHex(value, len);
+    Serial.println();
+#endif
+
+    for (int i = 0; i < len; ++i) {
+        if (!synchronousGlobalVariable(name + i, value[i])) {
+            return false;
         }
     }
-#if DE_BUG
-    Serial.println("[DEBUG] synchronousGlobalVariable outTime...");
-#endif
-    return false;
+
+    return true;
 }
 
+bool NetSynchronization::synchronousGlobalVariable(uint8_t name, uint8_t* value, uint8_t len) {
 
-uint16_t MainCar::getGlobalVariable(uint8_t name) {
-    name = name > 25 ? name - 'a' : name;
+#if DE_BUG
+    Serial.print("[DEBUG] synchronousGlobalVariables(8bit)...");
+    Serial.print("  originAddress(8bit):");
+    Serial.print(name);
+    Serial.print("  value:");
+    logHex(value, len);
+    Serial.println();
+#endif
+
+    for (int i = 0; i < len; ++i) {
+        if (!synchronousGlobalVariable(name + i, value[i])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+uint16_t NetSynchronization::getGlobalVariable(uint8_t name) {
     return globalVariable[name];
 }
 
-
-void MainCar::synchronizationTaskCompletion(uint8_t taskId) {
-    taskCompletion[taskId] = true;
-    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x01, taskId, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    messageBus.send(buf, 8);
+void NetSynchronization::getGlobalVariable(uint8_t name, uint16_t* buf, uint8_t len) {
+    for (int i = 0; i < len; ++i) {
+        buf[i] = globalVariable[name + i];
+    }
 }
 
-void MainCar::sendQr1LicensePlateNumber(uint8_t* data) {
-    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0xF1, data[5], data[4], data[3], 0x00, DATA_FRAME_TAIL};
-    messageBus.send(buf, 8);
-    uint8_t buf2[] = {DATA_FRAME_HEADER, id, 0xF2, data[2], data[1], data[0], 0x00, DATA_FRAME_TAIL};
-    messageBus.send(buf2, 8);
+void NetSynchronization::getGlobalVariable(uint8_t name, uint8_t* buf, uint8_t len) {
+    for (int i = 0; i < len; ++i) {
+        buf[i] = globalVariable[name + i];
+    }
 }
 
-void MainCar::sendQr2CalculationResult(uint8_t result) {
-    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0xF3, result, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    messageBus.send(buf, 8);
+bool NetSynchronization::synchronousLicensePlateNumber(uint8_t* data) {
+#if DE_BUG
+    Serial.print("[DEBUG] synchronousLicensePlateNumber...");
+    Serial.print("  data:");
+    logHex(data, 6);
+    Serial.println();
+#endif
+
+    bool s;
+#if FOR_THE_KING_HEN
+    uint8_t buf[] = {DATA_FRAME_HEADER, 0x01, 0x21, data[5], data[4], data[3], 0x00, DATA_FRAME_TAIL};
+    s = messageBus.sendAndWait(buf, 8, &licensePlateNumberHighReturnCount);
+    if (!s) {
+        return false;
+    }
+    uint8_t buf2[] = {DATA_FRAME_HEADER, 0x01, 0x22, data[2], data[1], data[0], 0x00, DATA_FRAME_TAIL};
+    s = messageBus.sendAndWait(buf2, 8, &licensePlateNumberLowReturnCount);
+    if (!s) {
+        return false;
+    }
+#endif
+
+    s = synchronousGlobalVariable(174, data, 6);
+    if (!s) {
+        return false;
+    }
+    s = synchronousGlobalVariable(173, 0xFFFF);
+    return s;
 }
 
-void MainCar::sendCarportALevel(uint8_t level) {
-    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0xF4, level, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    messageBus.send(buf, 8);
+bool NetSynchronization::getLicensePlateNumber(uint8_t* buf) {
+    if (!getGlobalVariable(173)) {
+        return false;
+    }
+    getGlobalVariable(174, buf, 6);
+    return true;
 }
+
+bool NetSynchronization::synchronousPathInformation(uint16_t* buf, uint8_t len) {
+#if DE_BUG
+    Serial.print("[DEBUG] synchronousPathInformation...");
+    Serial.print("  data:");
+    logHex(buf, len);
+    Serial.println();
+#endif
+    bool s = synchronousGlobalVariable(181, buf, inRand(len, 0, 32));
+    if (!s) {
+        return false;
+    }
+    s = synchronousGlobalVariable(180, 0xFFFF);
+    return s;
+}
+
+bool NetSynchronization::getPathInformation(uint16_t* buf, uint8_t maxLen, uint8_t* len) {
+    if (!getGlobalVariable(180)) {
+        return false;
+    }
+    getGlobalVariable(179, buf, inRand(maxLen, 0, 32));
+    for (int i = 0; i < 32; ++i) {
+        if (buf[i] == 0) {
+            *len = i + 1;
+        }
+    }
+    return true;
+}
+
+uint16_t NetSynchronization::getMainCarPos() {
+    return getGlobalVariable(213);
+}
+
+uint16_t NetSynchronization::getEntourageCarPos() {
+    return getGlobalVariable(214);
+}
+
+bool NetSynchronization::synchronousEntourageCarPos(uint16_t pos) {
+    return synchronousGlobalVariable(214, pos);
+}
+
 
 Car::Car(uint8_t id) : DeviceBase(id) {
-    straightLineSpeed = 20;
-    turnLeftSpeed = 40;
-    turnRightSpeed = 40;
-
-    straightLineKpSpeed = 60;
-    trimKpSpeed = 40;
-
-    outTime_ms = 20000;
-    trimOutTime_ms = 1000;
-
-    trackRowResultHigh.flagBitArray = flagBitArray;
-    trackRowResult.flagBitArray = flagBitArray + 2;
-    trackRowResultLow.flagBitArray = flagBitArray + 4;
 }
 
 void Car::carSleep(uint16_t time) {
@@ -1061,63 +1220,63 @@ uint16_t Car::getTrackLamp() {
     return code;
 }
 
-void Car::turnLeft(bool trimCar) {
+
+void Car::turnLeft(uint8_t angle) {
 #if DE_BUG
     Serial.println("[DEBUG] in turnLeft...");
 #endif
     DCMotor.SpeedCtr(-40, 40);
-    carSleep(1500);
+    sleep(16 * angle);
     DCMotor.Stop();
-    if (trimCar) {
-        this->trimCar();
-    }
 #if DE_BUG
     Serial.println("[DEBUG] end turnLeft...");
 #endif
 }
 
-void Car::turnRight(bool trimCar) {
+void Car::turnRight(uint8_t angle) {
 #if DE_BUG
     Serial.println("[DEBUG] in turnRight...");
 #endif
     DCMotor.SpeedCtr(40, -40);
-    carSleep(1500);
+    sleep(16 * angle);
     DCMotor.Stop();
-    if (trimCar) {
-        this->trimCar();
-    }
 #if DE_BUG
     Serial.println("[DEBUG] end turnRight...");
 #endif
 }
 
-void Car::trackTurnLeft(bool trimCar) {
+void Car::trackTurnLeft() {
 
 #if DE_BUG
     Serial.println("[DEBUG] in trackTurnLeft...");
 #endif
-    DCMotor.SpeedCtr(-turnLeftSpeed, turnLeftSpeed);
+    int8_t angle = k230.getCameraSteeringGearAngleCache();
+    k230.setCameraSteeringGearAngle(-80);
+
+    DCMotor.SpeedCtr(-turningSpeed, turningSpeed);
     rotationProcess();
     DCMotor.Stop();
-    if (trimCar) {
-        this->trimCar();
-    }
+
+    k230.setCameraSteeringGearAngle(angle);
+
 #if DE_BUG
     Serial.println("[DEBUG] end trackTurnLeft...");
 #endif
 }
 
-void Car::trackTurnRight(bool trimCar) {
+void Car::trackTurnRight() {
 
 #if DE_BUG
     Serial.println("[DEBUG] in trackTurnRight...");
 #endif
-    DCMotor.SpeedCtr(turnRightSpeed, -turnRightSpeed);
+    int8_t angle = k230.getCameraSteeringGearAngleCache();
+    k230.setCameraSteeringGearAngle(-80);
+
+    DCMotor.SpeedCtr(turningSpeed, -turningSpeed);
     rotationProcess();
     DCMotor.Stop();
-    if (trimCar) {
-        this->trimCar();
-    }
+
+    k230.setCameraSteeringGearAngle(angle);
 #if DE_BUG
     Serial.println("[DEBUG] end trackTurnRight...");
 #endif
@@ -1128,13 +1287,13 @@ void Car::rotationProcess() {
 
     unsigned long startTime = millis();
 
-    while (millis() - startTime < outTime_ms) {
+    while (millis() - startTime < outTimeMs) {
         acceptTrackFlag();
         if (!trackRowResult.bitCount) {
             break;
         }
     }
-    while (millis() - startTime < outTime_ms) {
+    while (millis() - startTime < outTimeMs) {
         acceptTrackFlag();
         if (trackRowResult.centerBitCount >= 3) {
             break;
@@ -1157,13 +1316,11 @@ void Car::waitCodeDisc(int16_t distance) {
 }
 
 void Car::trackAdvanceToNextJunction() {
-
-
     unsigned long startTime = millis();
 
-    DCMotor.SpeedCtr(straightLineSpeed, straightLineSpeed);
+    DCMotor.SpeedCtr(straightSpeed, straightSpeed);
 
-    while (millis() - startTime < outTime_ms) {
+    while (millis() - startTime < outTimeMs) {
         acceptTrackFlag();
 
         if ((trackRowResult.edgeBitCount >= 6 || trackRowResult.bitCount >= 12)) {
@@ -1172,7 +1329,8 @@ void Car::trackAdvanceToNextJunction() {
             Serial.println("[DEBUG] meet a junction...");
 #endif
 
-            advance(350);
+            // -80 m : 350
+            advance(580);
             trimCar();
             break;
 
@@ -1180,8 +1338,8 @@ void Car::trackAdvanceToNextJunction() {
 
         if (inRand(trackRowResult.offset, -0.2, 0.2)) {
 
-            int16_t lSpeed = straightLineSpeed;
-            int16_t rSpeed = straightLineSpeed;
+            int16_t lSpeed = straightSpeed;
+            int16_t rSpeed = straightSpeed;
 
             lSpeed += ((int16_t) (trackRowResult.offset * straightLineKpSpeed));
             rSpeed -= ((int16_t) (trackRowResult.offset * straightLineKpSpeed));
@@ -1202,7 +1360,7 @@ void Car::trackAdvanceToNextJunction() {
 void Car::overspecificRelief() {
     unsigned long startTime = millis();
 
-    while (millis() - startTime < outTime_ms) {
+    while (millis() - startTime < outTimeMs) {
         acceptTrackFlag();
         if (trackRowResult.flagBit == 0) {
             break;
@@ -1212,43 +1370,80 @@ void Car::overspecificRelief() {
         sleep(100);
     }
 
-    recoil(50);
+    while (millis() - startTime < outTimeMs) {
+        acceptTrackFlag();
 
-    //advance(200);
+        uint8_t lc = countBits(trackRowResult.flagBitArray, 2, 0, 4);
+        uint8_t rc = countBits(trackRowResult.flagBitArray, 2, 12, 16);
+
+        if (lc == 0 && rc == 0) {
+            advance(10);
+            sleep(50);
+            continue;
+        }
+
+        if (lc == 4 && rc == 4) {
+            break;
+        }
+
+        DCMotor.SpeedCtr(
+                lc > rc
+                ? -turningSpeed
+                : turningSpeed,
+                lc > rc
+                ? turningSpeed
+                : -turningSpeed
+        );
+
+        sleep(50);
+        DCMotor.Stop();
+
+        carSleep(100);
+    }
 
 
+    while (millis() - startTime < outTimeMs) {
 
-    /* while (millis() - startTime < outTime_ms) {
-         acceptTrackFlag();
+        DCMotor.SpeedCtr(straightSpeed, straightSpeed);
 
-         if (trackRowResult.flagBit == 0) {
-         }
+        acceptTrackFlag();
 
-         trackRowResult.centerBitCount = ~trackRowResult.centerBitCount;
-         uint8_t buf[2] = {};
-         lonelinessExclusion(flagBitArray, 2, buf);
-         centralPoint(buf, 2, nullptr, &trackRowResult.offset);
+        if (trackRowResult.flagBit == 0) {
 
-         if (inRand(trackRowResult.offset, -0.2, 0.2)) {
+            advance(100);
 
-             int16_t lSpeed = straightLineSpeed;
-             int16_t rSpeed = straightLineSpeed;
+            acceptTrackFlag();
 
-             lSpeed += ((int16_t) (trackRowResult.offset * straightLineKpSpeed));
-             rSpeed -= ((int16_t) (trackRowResult.offset * straightLineKpSpeed));
+            if (trackRowResult.edgeBitCount <= 3) {
+                break;
+            }
 
-             DCMotor.SpeedCtr(
-                     lSpeed,
-                     rSpeed
-             );
+        }
+
+        trackRowResult.centerBitCount = ~trackRowResult.centerBitCount;
+        uint8_t buf[2] = {};
+        lonelinessExclusion(flagBitArray, 2, buf);
+        centralPoint(buf, 2, nullptr, &trackRowResult.offset);
+
+        if (inRand(trackRowResult.offset, -0.2, 0.2)) {
+
+            int16_t lSpeed = straightSpeed;
+            int16_t rSpeed = straightSpeed;
+
+            lSpeed += ((int16_t) (trackRowResult.offset * straightLineKpSpeed));
+            rSpeed -= ((int16_t) (trackRowResult.offset * straightLineKpSpeed));
+
+            DCMotor.SpeedCtr(
+                    lSpeed,
+                    rSpeed
+            );
 
 
-         } else {
-             trimCar();
-         }
+        } else {
+            trimCar();
+        }
 
-     }
- */
+    }
 
     DCMotor.Stop();
 }
@@ -1256,8 +1451,8 @@ void Car::overspecificRelief() {
 void Car::advanceToNextJunction() {
     unsigned long startTime = millis();
 
-    DCMotor.SpeedCtr(straightLineSpeed, straightLineSpeed);
-    while (millis() - startTime < outTime_ms) {
+    DCMotor.SpeedCtr(straightSpeed, straightSpeed);
+    while (millis() - startTime < outTimeMs) {
         acceptTrackFlag();
         if ((trackRowResult.edgeBitCount >= 6 || trackRowResult.bitCount >= 12)) {
             DCMotor.Stop();
@@ -1270,9 +1465,9 @@ void Car::advanceToNextJunction() {
 void Car::recoilToNextJunction() {
     unsigned long startTime = millis();
 
-    DCMotor.SpeedCtr(-straightLineSpeed, -straightLineSpeed);
+    DCMotor.SpeedCtr(-straightSpeed, -straightSpeed);
 
-    while (millis() - startTime < outTime_ms) {
+    while (millis() - startTime < outTimeMs) {
         acceptTrackFlag();
 
         if ((trackRowResult.edgeBitCount >= 6 || trackRowResult.bitCount >= 12)) {
@@ -1285,18 +1480,17 @@ void Car::recoilToNextJunction() {
 
 void Car::advance(uint16_t distance) {
     DCMotor.SpeedCtr(
-            straightLineSpeed,
-            straightLineSpeed
+            straightSpeed,
+            straightSpeed
     );
     waitCodeDisc((int16_t) distance);
     DCMotor.Stop();
 }
 
-
 void Car::recoil(uint16_t distance) {
     DCMotor.SpeedCtr(
-            -straightLineSpeed,
-            -straightLineSpeed
+            -straightSpeed,
+            -straightSpeed
     );
     waitCodeDisc(-(int16_t) distance);
     DCMotor.Stop();
@@ -1307,7 +1501,7 @@ void Car::mobileCorrection(uint16_t step) {
     unsigned long startTime = millis();
     uint8_t positiveAttitude = 0;
     bool advanceTag = true;
-    while (millis() - startTime < outTime_ms) {
+    while (millis() - startTime < outTimeMs) {
         if (advanceTag) {
             advance(step);
         } else {
@@ -1336,7 +1530,7 @@ void Car::advanceCorrection(uint16_t step, uint8_t maximumFrequency) {
     unsigned long startTime = millis();
     uint8_t positiveAttitude = 0;
     uint8_t advanceTag = 0;
-    while (millis() - startTime < outTime_ms) {
+    while (millis() - startTime < outTimeMs) {
 
         carSleep(50);
         acceptTrackFlag();
@@ -1365,14 +1559,13 @@ void Car::trimCar() {
     trimCar(&trackRowResult, 0);
 }
 
-
 void Car::trimCar(TrackRowResult* trackRowResult, float offset) {
 #if DE_BUG
     Serial.println("[DEBUG] in trimCar...");
 #endif
 
     unsigned long startTime = millis();
-    while (millis() - startTime < trimOutTime_ms) {
+    while (millis() - startTime < trimOutTimeMs) {
         acceptTrackFlag();
 
         float trimOffset = trackRowResult->offset + offset;
@@ -1422,7 +1615,7 @@ void Car::rightCar() {
     carSleep(200); // 等待摄像头稳定
 
     unsigned long startTime = millis();
-    while (millis() - startTime < trimOutTime_ms) {
+    while (millis() - startTime < trimOutTimeMs) {
         acceptTrackFlag();
 
         float offsetLow = trackRowResultLow.offset;
@@ -1460,7 +1653,7 @@ void Car::trimCar() {
 
     unsigned long startTime = millis();
 
-    while (millis() - startTime < trimOutTime_ms) {
+    while (millis() - startTime < trimOutTimeMs) {
         acceptTrackFlag();
 
         float angleError = highOffset - lowOffset;
@@ -1522,6 +1715,128 @@ void Car::ledShine(int number, int wait) {
 }
 
 
+void SandTable::adjustDirection(Pos pos, Direction current, Direction target) {
+    if (current == target) {
+        return;
+    }
+
+    if (unpack(pos) == assembly("B6") && target == D_RIGHT) {
+
+        car.turnLeft();
+        car.recoil(500);
+        car.trimCar();
+        car.advance(50);
+
+        return;
+    }
+
+    switch (current) {
+        case D_UP:
+            switch (target) {
+                case D_UNDER:
+                    car.trackTurnLeft();
+                    car.trackTurnLeft();
+                    break;
+                case D_LEFT:
+                    car.trackTurnLeft();
+                    break;
+                case D_RIGHT:
+                    car.trackTurnRight();
+                    break;
+            }
+            break;
+        case D_UNDER:
+            switch (target) {
+                case D_UP:
+                    car.trackTurnLeft();
+                    car.trackTurnLeft();
+                    break;
+                case D_LEFT:
+                    car.trackTurnRight();
+                    break;
+                case D_RIGHT:
+                    car.trackTurnLeft();
+                    break;
+            }
+            break;
+        case D_LEFT:
+            switch (target) {
+                case D_UP:
+                    car.trackTurnRight();
+                    break;
+                case D_UNDER:
+                    car.trackTurnLeft();
+                    break;
+                case D_RIGHT:
+                    car.trackTurnLeft();
+                    car.trackTurnLeft();
+                    break;
+            }
+            break;
+        case D_RIGHT:
+            switch (target) {
+                case D_UP:
+                    car.trackTurnLeft();
+                    break;
+                case D_UNDER:
+                    car.trackTurnRight();
+                    break;
+                case D_LEFT:
+                    car.trackTurnLeft();
+                    car.trackTurnLeft();
+                    break;
+            }
+            break;
+    }
+
+    car.trimCar();
+}
+
+void SandTable::move(Pos a, Pos b) {
+    if (unpack(a) == assembly("B6") && unpack(a) == assembly("D6")) {
+        car.overspecificRelief();
+        car.trackAdvanceToNextJunction();
+        return;
+    }
+    car.trackAdvanceToNextJunction();
+}
+
+void SandTable::moveTo(Pos startPosition, Direction startDirection, Pos endPos, Direction* endDirection) {
+    int dx = endPos.x - startPosition.x;
+    int dy = endPos.y - startPosition.y;
+
+    int x_step = dx / 2;
+    Direction x_dir = x_step > 0 ? D_RIGHT : D_LEFT;
+
+    int y_step = dy / 2;
+    Direction y_dir = y_step > 0 ? D_UNDER : D_UP;
+
+    Direction current_dir = startDirection;
+
+    Pos _s = startPosition;
+
+    if (x_step > 0) {
+        adjustDirection(_s, current_dir, x_dir);
+        for (int i = 0; i < x_step; ++i) {
+            car.trackAdvanceToNextJunction();
+        }
+        current_dir = x_dir;
+        _s.x = endPos.x;
+    }
+
+    // 处理y轴移动
+    if (y_step > 0) {
+        adjustDirection(_s, current_dir, y_dir);
+        for (int i = 0; i < y_step; ++i) {
+            car.trackAdvanceToNextJunction();
+        }
+        current_dir = y_dir;
+    }
+
+    *endDirection = current_dir;
+}
+
+
 #pragma clang diagnostic pop
 
 MessageBus messageBus;
@@ -1546,5 +1861,9 @@ StereoscopicDisplay stereoscopicDisplayA(0x11);
 
 UltrasonicDevice ultrasonicDevice;
 K230 k230(0x02);
+NetSynchronization netSynchronization;
 Car car(0x02);
 MainCar mainCar(0x01);
+
+SandTable sandTable;
+

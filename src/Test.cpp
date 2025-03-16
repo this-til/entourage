@@ -22,16 +22,17 @@ K230Test k230Test;
 #endif
 }*/
 
+
 void CarTest::figureEightCycle() {
-    k230.setCameraSteeringGearAngle(-80);
+    k230.setCameraSteeringGearAngle(-50);
     k230.setTrackModel(TRACK_MIDDLE);
     for (int i = 0; i < 100; ++i) {
         car.trackAdvanceToNextJunction();
 
-        car.turnLeft(false);
-        car.recoil(100);
+        car.turnLeft();
+        car.recoil(500);
         car.trimCar();
-        car.recoilToNextJunction();
+        //car.recoilToNextJunction();
         car.advance(50);
         car.overspecificRelief();
 
@@ -57,28 +58,28 @@ void CarTest::figureEightCycle() {
 
 
 void CarTest::trackAdvanceToNextJunctionTest() {
-    k230.setCameraSteeringGearAngle(-80);
+    k230.setCameraSteeringGearAngle(-55);
     k230.setTrackModel(TRACK_MIDDLE);
     car.trackAdvanceToNextJunction();
     k230.setTrackModel(false);
 }
 
 void CarTest::mobileCorrectionTest() {
-    k230.setCameraSteeringGearAngle(-80);
+    k230.setCameraSteeringGearAngle(-55);
     k230.setTrackModel(TRACK_MIDDLE);
     car.mobileCorrection(200);
     k230.setTrackModel(false);
 }
 
 void CarTest::rightCarTest() {
-    k230.setCameraSteeringGearAngle(-80);
+    k230.setCameraSteeringGearAngle(-55);
     k230.setTrackModel(TRACK_MIDDLE);
     car.rightCar();
     k230.setTrackModel(false);
 }
 
 void CarTest::advanceCorrectionTest() {
-    k230.setCameraSteeringGearAngle(-80);
+    k230.setCameraSteeringGearAngle(-55);
     k230.setTrackModel(TRACK_MIDDLE);
     car.advanceCorrection(50, 6);
     k230.setTrackModel(false);

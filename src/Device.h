@@ -5,6 +5,8 @@
 #ifndef ENTOURAGE_CLION_DEVICE_H
 #define ENTOURAGE_CLION_DEVICE_H
 
+//哄老母鸡被迫留下来的痔疮代码
+#define FOR_THE_KING_HEN true
 
 #define DETECTED_VALUE_CHANGE(name)                                                                                     \
 unsigned long startTime = millis();                                                                                     \
@@ -112,6 +114,8 @@ void logObj(enum TrafficLightModel trafficLightModel);
 
 void logObj(enum K210Color k210Color);
 
+TrafficLightModel k230ColorToTrafficLightModel(K210Color k210Color);
+
 void deviceSetup();
 
 class MessageBus {
@@ -121,6 +125,8 @@ public:
     void addVerify(uint8_t* buf, uint8_t len);
 
     void send(uint8_t* buf, uint8_t len, uint16_t bus = 0x6008, bool addVerify = true, unsigned long sendCoolingMs = 300);
+
+    bool sendAndWait(uint8_t* buf, uint8_t len, const uint8_t* returnCount, uint16_t bus = 0x6008, bool addVerify = true, unsigned long sendCoolingMs = 300, unsigned long maxWaitingTimeMs = 5000);
 
     bool check(const uint8_t* buf, uint8_t len, uint8_t id, const uint8_t* serviceId, uint8_t serviceLen, bool verify = true);
 
@@ -508,7 +514,6 @@ public:
      */
     void showDistance(uint8_t value);
 
-
     /***
      * 显示"图形"
      */
@@ -575,7 +580,7 @@ struct QrMessage {
     /***
  * 二维码信息容器
  */
-    uint8_t* message{};
+    uint8_t* message = nullptr;
 
     uint8_t messageMaxLen = 0;
 
@@ -639,7 +644,7 @@ public:
      * @param maxRetry 最大重试次数
      * @return
      */
-    bool trafficLightRecognize_rigorous(K210Color* k210Color, uint16_t consecutiveEqualDegree = 3, uint16_t maxRetry = 48);
+    bool trafficLightRecognize_rigorous(K210Color* k210Color, uint16_t consecutiveEqualDegree = 3, uint16_t maxRetry = 24);
 
     /***
      * 测试连接用的
@@ -653,50 +658,6 @@ private:
     uint8_t trackModel{};
     bool receiveTrack;
     int8_t cameraSteeringGearAngle{};
-};
-
-
-class MainCar : public DeviceBase {
-public:
-    explicit MainCar(uint8_t id);
-
-    /***
-     * 自动同步一个全局数据
-     * @param name [0,25] U [a,z]
-     * @param value
-     */
-    bool synchronousGlobalVariable(uint8_t name, uint16_t value);
-
-    uint16_t getGlobalVariable(uint8_t name);
-
-    void synchronizationTaskCompletion(uint8_t taskId);
-
-    /***
-     * 发送二维码识别的车牌号
-     * @param data len = 6
-     */
-    void sendQr1LicensePlateNumber(uint8_t data[]);
-
-    /***
-     * 发送车库A的初始层级
-     * @param level
-     */
-    void sendCarportALevel(uint8_t level);
-
-    void sendQr2CalculationResult(uint8_t result);
-
-    void onReceiveZigbeeMessage(uint8_t* buf) override;
-
-
-//==========全局变量=========
-
-/***
- * 开始位置
- */
-    uint8_t startPos = 0;
-    uint16_t globalVariable[26] = {};
-    uint8_t globalVariableReturnCount = 0;
-    boolean taskCompletion[20] = {};
 };
 
 struct TrackRowResult {
@@ -748,8 +709,6 @@ public:
     /***
      * 通过特殊地形
      * 然后调用advanceToNextJunction
-     *
-     * @param forkInto 表示是从岔路进入的特殊地形
      */
     void overspecificRelief();
 
@@ -770,13 +729,13 @@ public:
  */
     void recoil(uint16_t distance);
 
-    void trackTurnLeft(bool trimCar = true);
+    void trackTurnLeft();
 
-    void trackTurnRight(bool trimCar = true);
+    void trackTurnRight();
 
-    void turnLeft(bool trimCar = true);
+    void turnLeft(uint8_t angle = 90);
 
-    void turnRight(bool trimCar = true);
+    void turnRight(uint8_t angle = 90);
 
     /***
      * 微调车姿态
@@ -812,21 +771,19 @@ public:
 
     void onReceiveZigbeeMessage(uint8_t* buf) override;
 
-    int16_t straightLineSpeed;
-    int16_t turnLeftSpeed;
-    int16_t turnRightSpeed;
-    int16_t straightLineKpSpeed;
-    int16_t trimKpSpeed;
+    int16_t straightSpeed = 20;
+    int16_t turningSpeed = 40;
+    int16_t straightLineKpSpeed = 60;
 
-    unsigned long trimOutTime_ms;
-    unsigned long outTime_ms;
+    unsigned long trimOutTimeMs = 1000;
+    unsigned long outTimeMs = 20000;
 
 
 private:
     uint8_t flagBitArray[6] = {};
-    TrackRowResult trackRowResultHigh{};
-    TrackRowResult trackRowResult{};
-    TrackRowResult trackRowResultLow{};
+    TrackRowResult trackRowResultHigh{flagBitArray + 0};
+    TrackRowResult trackRowResult{flagBitArray + 2};
+    TrackRowResult trackRowResultLow{flagBitArray + 3};
 
     void rotationProcess();
 
@@ -837,6 +794,122 @@ private:
     void waitCodeDisc(int16_t distance);
 
     void acceptTrackRowFlag(TrackRowResult* trackRowResult);
+};
+
+class MainCar : public DeviceBase {
+public:
+    explicit MainCar(uint8_t id);
+
+
+    void onReceiveZigbeeMessage(uint8_t* buf) override;
+
+};
+
+class NetSynchronization {
+public:
+
+    /***
+     * 全局变量
+     */
+    uint16_t globalVariable[256] = {};
+
+    uint8_t globalVariableReturnCount = 0;
+
+    /***
+    * 自动同步一个全局数据
+    * @param name [0,255]
+    * @param value
+    */
+    bool synchronousGlobalVariable(uint8_t name, uint16_t value);
+
+    /***
+     * 同步连续的数据
+     */
+    bool synchronousGlobalVariable(uint8_t name, uint16_t* value, uint8_t len);
+
+    bool synchronousGlobalVariable(uint8_t name, uint8_t* value, uint8_t len);
+
+    uint16_t getGlobalVariable(uint8_t name);
+
+    void getGlobalVariable(uint8_t name, uint16_t* buf, uint8_t len);
+
+    void getGlobalVariable(uint8_t name, uint8_t* buf, uint8_t len);
+
+
+#if FOR_THE_KING_HEN
+    uint8_t licensePlateNumberHighReturnCount = 0;
+
+    uint8_t licensePlateNumberLowReturnCount = 0;
+#endif
+
+    /***
+     * 同步车牌号信息
+     * 校验地址:173
+     * 起始地址位:174
+     * 数据长度:6
+     * @param data len = 6
+     * @return
+     */
+    bool synchronousLicensePlateNumber(uint8_t* data);
+
+    /***
+     * 获取车牌号信息
+     * @param buf len = 6
+     * @return 是否是有效信息
+     */
+    bool getLicensePlateNumber(uint8_t* buf);
+
+    /***
+     * 同步路径信息
+     * 校验地址:180
+     * 起始地址:181
+     * 最大长度:32
+     */
+    bool synchronousPathInformation(uint16_t* buf, uint8_t len);
+
+    bool getPathInformation(uint16_t* buf, uint8_t maxLen, uint8_t* len);
+
+    /***
+     * 获取主车位置
+     * 地址:213
+     * @return
+     */
+    uint16_t getMainCarPos();
+
+    /***
+     * 同步从车位置
+     * @return
+     */
+    bool synchronousEntourageCarPos(uint16_t pos);
+
+    /***
+     * 获取从车位置
+     * 地址:214
+     * @return
+     */
+    uint16_t getEntourageCarPos();
+
+};
+
+
+/***
+ * 你的沙盘，来着蒸汽宏伟之力的自动驾驶
+ */
+class SandTable {
+
+public:
+    /***
+     * 调用前进仅能前进到下一个路口，x,y偶数位置必定组成路口，不会要求停在非路口
+     * @param startPosition
+     * @param startDirection
+     * @param endPos
+     * @param endDirection
+     */
+    void moveTo(struct Pos startPosition, enum Direction startDirection, struct Pos endPos, enum Direction* endDirection);
+
+    void adjustDirection(struct Pos pos, enum Direction current, enum Direction target);
+
+    void move(struct Pos a, struct Pos b);
 };
 
 extern DeviceBase* allDeviceBase[256];
@@ -909,12 +982,17 @@ extern UltrasonicDevice ultrasonicDevice;
  * 摄像头
  */
 extern K230 k230;
+
+extern NetSynchronization netSynchronization;
+
 /***
  * 你的小车车
  */
 extern Car car;
 
 extern MainCar mainCar;
+
+extern SandTable sandTable;
 
 //==============总览==============
 

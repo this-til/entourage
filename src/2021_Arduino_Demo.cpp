@@ -1,48 +1,8 @@
 #include "2021_Arduino_Demo.h"
 
 
-static uint8_t Light_plus1[4] = {0x00, 0xFF, 0x0C, static_cast<uint8_t>(~(0x0C))};  // 智能路灯 光源挡位加1
-static uint8_t Light_plus2[4] = {0x00, 0xFF, 0x18, static_cast<uint8_t>(~(0x18))};  // 智能路灯 光源挡位加2
-static uint8_t Light_plus3[4] = {0x00, 0xFF, 0x5E, static_cast<uint8_t>(~(0x5E))};  // 智能路灯 光源挡位加3
-
-uint8_t ZigBee_back[16] = {0x55, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                           0x00};
-// 存储ZigBee模块的返回数据，初始化为指定的16字节序列
-
-#define TSendCycle 200
-// 定义发送周期的时间间隔，值为200
-
-#define ATM_Data_Length 48
-// 定义ATM数据的长度，值为48
-
-uint8_t ATM_Data[ATM_Data_Length];
-// 存储ATM数据的数组，长度为48
-
-uint8_t ZigBee_command[8];
-// 存储ZigBee命令的数组，长度为8
-
-uint8_t ZigBee_judge;
-// 用于判断ZigBee模块的状态的单字节变量
-
-uint8_t Rbuf_judge;
-
-uint8_t infrare_com[6];
-// 存储红外命令的数组，长度为6
-
-uint8_t sendflag;
-// 标记发送状态的单字节变量
-
-unsigned long frisrtime;
-// 记录起始时间的无符号长整型变量
-
-unsigned long Tcount;
-// 计数的无符号长整型变量
 
 
-uint8_t Data_Type;
-uint8_t Data_Flag;
-uint8_t Data_Length;
-uint8_t Data_OTABuf[40];
 
 /*void setup() {
     l_setup();
@@ -58,6 +18,7 @@ defineTask(TaskCar);
 
 void l_setup() {
     Serial.begin(115200);
+    Serial3.begin(9600);
     // 初始化串口通信，波特率115200
     CoreLED.Initialization();
     // 初始化CoreLED模块
@@ -83,18 +44,12 @@ void l_setup() {
     // 初始化BKRC_Voice模块
 
     while (!Serial);
-    // 等待串口连接就绪
-    sendflag = 0;
-    // 初始化sendflag变量为0
-    frisrtime = 0;
-    // 初始化frisrtime变量为0
-    Tcount = 0;
-    // 初始化Tcount变量为0
-
-    mySCoop.start();
+    while (!Serial3);
 
     dataSetUp();
     deviceSetup();
+
+    mySCoop.start();
 
     Serial.println("init end");
 
@@ -111,29 +66,7 @@ void TaskMain::setup() {
  * 循环内总线发送0x6008 接收0x6100、0x6038
  */
 void TaskMain::loop() {
-
     CoreKEY.Kwhile(keyHandler);
-
-    if (((millis() - frisrtime >= TSendCycle) || (Tcount >= TSendCycle)) && (sendflag == 1))  //获取、上传任务版数据
-    {
-        uint16_t tp = (uint16_t) (Ultrasonic.Ranging(CM) * 10.0);
-        ZigBee_back[5] = (tp >> 8) & 0xff;
-        ZigBee_back[4] = tp & 0xff;
-
-        tp = BH1750.ReadLightLevel();
-        ZigBee_back[7] = (tp >> 8) & 0xff;
-        ZigBee_back[6] = tp & 0xff;
-
-        ZigBee_back[9] = (uint8_t) ExtSRAMInterface.ExMem_Read(0x6003);
-        if (ZigBee_back[9] >= 0x80) ZigBee_back[9] = 0xff - ZigBee_back[9];
-        ZigBee_back[8] = (uint8_t) ExtSRAMInterface.ExMem_Read(0x6002);
-
-        ExtSRAMInterface.ExMem_Write_Bytes(0x6080, ZigBee_back, 16);
-        Tcount = 0x00;
-    } else if (sendflag == 1) {
-        Tcount += (millis() - frisrtime);
-    }
-
 }
 
 void TaskCar::setup() {
@@ -141,8 +74,7 @@ void TaskCar::setup() {
 
 uint8_t zigbeeBuf[8] = {};
 
-void TaskCar::loop() {
-
+void acceptZigbee() {
     // zigbee
     if (ExtSRAMInterface.ExMem_Read(0x6100) == 0x00) {
         return;
@@ -186,6 +118,186 @@ void TaskCar::loop() {
 
 }
 
+uint8_t uploadTaskBoardZigBeeBack[16] = {0x55, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+#define uploadTaskBoardCycleMs 200
+bool isUploadTaskBoard = 0;
+unsigned long uploadTaskBoardRecordingTime = 0;
+
+void uploadTaskBoard() {
+    if (!isUploadTaskBoard) {
+        return;
+    }
+    if (millis() - uploadTaskBoardRecordingTime < uploadTaskBoardCycleMs) {
+        return;
+    }
+    uploadTaskBoardRecordingTime = millis();
+
+    uint16_t tp = (uint16_t) (Ultrasonic.Ranging(CM) * 10.0);
+    uploadTaskBoardZigBeeBack[5] = (tp >> 8) & 0xff;
+    uploadTaskBoardZigBeeBack[4] = tp & 0xff;
+
+    tp = BH1750.ReadLightLevel();
+    uploadTaskBoardZigBeeBack[7] = (tp >> 8) & 0xff;
+    uploadTaskBoardZigBeeBack[6] = tp & 0xff;
+
+    uploadTaskBoardZigBeeBack[9] = (uint8_t) ExtSRAMInterface.ExMem_Read(0x6003);
+    if (uploadTaskBoardZigBeeBack[9] >= 0x80) uploadTaskBoardZigBeeBack[9] = 0xff - uploadTaskBoardZigBeeBack[9];
+    uploadTaskBoardZigBeeBack[8] = (uint8_t) ExtSRAMInterface.ExMem_Read(0x6002);
+
+    ExtSRAMInterface.ExMem_Write_Bytes(0x6080, uploadTaskBoardZigBeeBack, 16);
+
+}
+
+void TaskCar::loop() {
+    acceptZigbee();
+    uploadTaskBoard();
+}
+
+uint16_t path[32] = {};
+uint16_t forecastPath[32] = {};
+uint8_t qrBuf[48] = {};
+uint8_t licensePlateBuf[6] = {};
+
+void questions5() {
+    uint8_t len = 0;
+    while (!netSynchronization.getPathInformation(path, 32, &len)) {
+        yield();
+    }
+
+    uint16_t initiation = path[0];
+
+    k230.setCameraSteeringGearAngle(-55);
+    k230.setTrackModel(TRACK_MIDDLE);
+
+    car.trackAdvanceToNextJunction(); //F1->F2
+    car.trackTurnRight();
+    car.trimCar();
+
+    k230.setTrackModel(0);
+    k230.setCameraSteeringGearAngle(0);
+    trafficLightA.requestToEnterRecognitionMode();
+
+    K210Color trafficLightColor;
+    k230.trafficLightRecognize_rigorous(&trafficLightColor);
+    trafficLightA.requestConfirmationOfIdentificationResults(k230ColorToTrafficLightModel(trafficLightColor)); // 任务8
+
+    k230.setCameraSteeringGearAngle(-55);
+    k230.setTrackModel(TRACK_MIDDLE);
+
+    car.trackAdvanceToNextJunction(); //F2->D2
+
+    car.trackAdvanceToNextJunction(); //D2->B2
+
+    k230.setTrackModel(0);
+    k230.setCameraSteeringGearAngle(0);
+
+    //二维码
+    uint8_t qrCount;
+    k230.qrRecognize(&qrCount, qrMessageArray, 4);
+
+
+    uint8_t qr1SpecialNumber = 0;
+    uint8_t qr2SpecialNumber = 0;
+
+    excludeSpecialCharacter(qrMessageArray[0].message, qrMessageArray[0].messageLen, qrBuf, 48, &qr1SpecialNumber);
+    excludeSpecialCharacter(qrMessageArray[1].message, qrMessageArray[1].messageLen, qrBuf, 48, &qr1SpecialNumber);
+
+    QrMessage* qr1Message;
+    QrMessage* qr2Message;
+
+    if (qr1SpecialNumber < qr2SpecialNumber) {
+        qr1Message = qrMessageArray;
+        qr2Message = qrMessageArray + 1;
+    } else {
+        qr1Message = qrMessageArray + 1;
+        qr2Message = qrMessageArray;
+    }
+
+    excludeSpecialCharacter(qr1Message->message, qr1Message->messageLen, licensePlateBuf, 6);
+
+    netSynchronization.synchronousLicensePlateNumber(licensePlateBuf);
+
+
+    k230.setCameraSteeringGearAngle(-55);
+    k230.setTrackModel(TRACK_MIDDLE);
+
+    car.trackTurnLeft();
+
+    barrierGateA.setLicensePlateData(licensePlateBuf);
+    /*while (!barrierGateA.getGateControl()) {
+        yield();
+    }*/
+
+    car.trackAdvanceToNextJunction(); //B2->B4
+
+    car.turnLeft(45);
+    sleep(500);
+    stereoscopicDisplayA.showLicensePlate(licensePlateBuf, 0, 0);
+    sleep(500);
+    car.turnRight(45);
+    car.trimCar();
+
+    uint16_t* _path = path + 2;
+    uint8_t _len = len - 3;
+
+
+    assembly(forecastPath, _len, "D4");
+    if (equals(_path, forecastPath, _len)) {
+        car.trackTurnLeft();
+        car.trackAdvanceToNextJunction(); //B4->D4
+
+        netSynchronization.synchronousGlobalVariable('q', 0);
+        car.trackTurnRight();
+
+        car.trackAdvanceToNextJunction(); //D4->D6
+
+        car.trackTurnRight();
+        car.trackTurnRight();
+    }
+
+    assembly(forecastPath, _len, "B6");
+    if (equals(_path, forecastPath, _len)) {
+        car.trackAdvanceToNextJunction(); //B4->B6
+        netSynchronization.synchronousGlobalVariable('q', 0);
+
+        car.turnLeft();
+        car.recoil(500);
+        car.trimCar();
+        car.advance(50);
+        car.overspecificRelief();
+        car.trackAdvanceToNextJunction(); //B6->D6
+        car.turnLeft();
+    }
+
+    /* Direction endDirection;
+     for (int i = 1; i < len - 1; ++i) {
+         sandTable.moveTo(pack(path[i]), D_UNDER, pack(path[i + 1]), &endDirection);
+         if (path[i + 1] == assembly("B6")) {
+             CoreBeep.TurnOn();
+             sleep(1000);
+             CoreBeep.TurnOff();
+             netSynchronization.synchronousGlobalVariable('q', 0);
+         }
+     }
+
+     sandTable.adjustDirection(pack(assembly("D6")), endDirection, D_UP);*/
+
+    bool haveGarage = false;
+    if (haveGarage) {
+
+        uint8_t level;
+        carportA.getLevel(&level);
+        netSynchronization.synchronousGlobalVariable('h', level);
+
+
+    } else {
+        netSynchronization.synchronousGlobalVariable('h', 2);
+        car.advanceCorrection(50, 6);
+        car.recoilToNextJunction();
+        car.recoil(600);
+    }
+}
 
 void keyHandler(uint8_t k_value) {
 #if DE_BUG
@@ -194,37 +306,29 @@ void keyHandler(uint8_t k_value) {
     Serial.println();
 #endif
 
-    K210Color k210Color;
-    uint8_t count;
-
     uint8_t level;
 
     bool ventral;
     bool rearSide;
 
+
     switch (k_value) {
         case 0x01:
-            /*//stereoscopicDisplayA.showText(gbk, 12);
-            carTest.figureEightCycle();
-
-            //car.advance(300);*/
-
-
-            mainCar.synchronousGlobalVariable('a', 0x16);
-            mainCar.synchronousGlobalVariable('b', 0x32);
+            questions5();
 
             break;
         case 0x02:
-            carTest.advanceCorrectionTest();
+            //carTest.advanceCorrectionTest();
+
+            netSynchronization.synchronousGlobalVariable('q', 0);
             break;
         case 0x03:
 
 
-            k230.setCameraSteeringGearAngle(-55);
             k230.setTrackModel(TRACK_MIDDLE);
             carportA.moveToLevel(1);
 
-            car.mobileCorrection(200);
+            car.advanceCorrection(50, 6);
 
             k230.setTrackModel(0);
 
@@ -261,27 +365,18 @@ void keyHandler(uint8_t k_value) {
 
             break;
         case 0x04:
-            k230Test.qrRecognizeTest();
+
+            //carTest.figureEightCycle();
+            k230.setCameraSteeringGearAngle(-55);
+            k230.setTrackModel(TRACK_MIDDLE);
+
+            car.trackTurnLeft();
+
+            k230.setTrackModel(0);
+
             break;
     }
 }
-
-
-void Beep_time3() {
-    CoreBeep.Initialization();
-    CoreBeep.TurnOn();
-    delay(100);
-    CoreBeep.TurnOff();
-    delay(100);
-    CoreBeep.TurnOn();
-    delay(100);
-    CoreBeep.TurnOff();
-    delay(100);
-    CoreBeep.TurnOn();
-    delay(100);
-    CoreBeep.TurnOff();
-}
-
 
 /*
 语音识别
