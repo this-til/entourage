@@ -102,6 +102,7 @@ uint8_t name1##_##name2##_##name3##Version;                                     
 #include "def.h"
 #include "Enum.h"
 #include "Cache.h"
+#include <stdio.h>
 
 
 void logObj(enum Weather weather);
@@ -812,6 +813,7 @@ public:
      * 全局变量
      */
     uint16_t globalVariable[256] = {};
+    uint8_t globalVariableVersion[256] = {};
 
     uint8_t globalVariableReturnCount = 0;
 

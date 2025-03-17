@@ -310,15 +310,35 @@ float centralPoint(uint8_t* value, uint32_t len, float* centerShift, float* cent
 }
 
 uint16_t assembly(const char* str) {
-    return str[0] << 8 | str[1];
+    return ((uint8_t) str[0] << 8) | (uint8_t) str[1];
 }
 
-void assembly(uint16_t* array, uint8_t len, const char* str) {
-    for (int i = 0; i < len; ++i) {
-        array[i] = assembly(str + (i * 2));
+void assembly(const char* str, uint16_t* outArray, uint8_t maxArrayLen) {
+    uint8_t count = 0;
+    while (count < maxArrayLen && *str && *(str + 1)) {
+        outArray[count] = (uint16_t) ((*str) << 8 | *(str + 1));
+        str += 2;
+        count++;
     }
 }
 
+void analyze(uint16_t* array, uint8_t maxArrayLen, char* outStr, uint8_t maxStrLen) {
+    uint8_t outIndex = 0; // 记录输出字符串的当前位置
+    for (uint8_t i = 0; i < maxArrayLen; ++i) {
+        // 检查剩余空间是否足够写入两个字符 + 终止符
+        if (outIndex + 2 >= maxStrLen) break;
+
+        // 提取高8位和低8位，转换为字符
+        char high = static_cast<char>((array[i] >> 8) & 0xFF);
+        char low = static_cast<char>(array[i] & 0xFF);
+
+        // 写入输出字符串
+        outStr[outIndex++] = high;
+        outStr[outIndex++] = low;
+    }
+    // 确保字符串以'\0'结尾
+    outStr[outIndex] = '\0';
+}
 
 void excludeSpecialCharacter(const uint8_t* source, uint8_t sourceLen, uint8_t* out, uint8_t outLen, uint8_t* specialNumber) {
     uint8_t outIndex = 0;
@@ -464,4 +484,5 @@ int16_t evaluateTheExpression(const uint8_t* expr, uint16_t var[]) {
 
     return pop_operand(&op_stack);
 }
+
 

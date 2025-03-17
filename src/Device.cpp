@@ -228,10 +228,10 @@ void BarrierGate::setInitialPos(bool isUp) {
 }
 
 void BarrierGate::setLicensePlateData(uint8_t* data) {
-    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x10, data[5], data[4], data[3], 0x00, DATA_FRAME_TAIL};
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x10, data[0], data[1], data[2], 0x00, DATA_FRAME_TAIL};
     messageBus.send(buf, 8);
 
-    uint8_t buf2[] = {DATA_FRAME_HEADER, id, 0x11, data[2], data[1], data[0], 0x00, DATA_FRAME_TAIL};
+    uint8_t buf2[] = {DATA_FRAME_HEADER, id, 0x11, data[3], data[4], data[5], 0x00, DATA_FRAME_TAIL};
     messageBus.send(buf2, 8);
 }
 
@@ -936,6 +936,7 @@ void Car::onReceiveZigbeeMessage(uint8_t* buf) {
         case 0x01: //同步全局变量
             name = buf[3];
             netSynchronization.globalVariable[name] = buf[4] << 8 | buf[5];
+            netSynchronization.globalVariableVersion[name]++;
 #if DE_BUG
             Serial.print("[DEBUG] synchronousGlobalVariable...");
             Serial.print("  name:");
@@ -983,7 +984,6 @@ void Car::onReceiveZigbeeMessage(uint8_t* buf) {
 #endif
             break;
         case 0x22:
-
 #if DE_BUG
             Serial.print("[DEBUG] synchronousLicensePlateNumber low...");
             Serial.print("  data:");
@@ -1010,14 +1010,23 @@ void Car::onReceiveZigbeeMessage(uint8_t* buf) {
 
 
 bool NetSynchronization::synchronousGlobalVariable(uint8_t name, uint16_t value) {
-    netSynchronization.globalVariable[name] = value;
+    globalVariable[name] = value;
+    globalVariableVersion[name]++;
+
+    //char aabb[256] = {};
+    //aabb[255] = 'a';
+    //Serial.print(aabb);
 
 #if DE_BUG
     Serial.print("[DEBUG] synchronousGlobalVariable...");
     Serial.print("  name:");
-    Serial.print(name);
+
+    //char str[5];
+    //sprintf(str, "%d", name);
+    //Serial.print(str);
+
     Serial.print("  value:");
-    Serial.print(value);
+    //Serial.print(value);
     Serial.print("  value(HEX):");
     uint8_t bufLog[] = {(uint8_t) (value >> 8), (uint8_t) value};
     logHex(bufLog, 2);
@@ -1061,7 +1070,7 @@ bool NetSynchronization::synchronousGlobalVariable(uint8_t name, uint8_t* value,
 
 #if DE_BUG
     Serial.print("[DEBUG] synchronousGlobalVariables(8bit)...");
-    Serial.print("  originAddress(8bit):");
+    Serial.print("  originAddress:");
     Serial.print(name);
     Serial.print("  value:");
     logHex(value, len);
@@ -1103,12 +1112,12 @@ bool NetSynchronization::synchronousLicensePlateNumber(uint8_t* data) {
 
     bool s;
 #if FOR_THE_KING_HEN
-    uint8_t buf[] = {DATA_FRAME_HEADER, 0x01, 0x21, data[5], data[4], data[3], 0x00, DATA_FRAME_TAIL};
+    uint8_t buf[] = {DATA_FRAME_HEADER, 0x01, 0x21, data[0], data[1], data[2], 0x00, DATA_FRAME_TAIL};
     s = messageBus.sendAndWait(buf, 8, &licensePlateNumberHighReturnCount);
     if (!s) {
         return false;
     }
-    uint8_t buf2[] = {DATA_FRAME_HEADER, 0x01, 0x22, data[2], data[1], data[0], 0x00, DATA_FRAME_TAIL};
+    uint8_t buf2[] = {DATA_FRAME_HEADER, 0x01, 0x22, data[3], data[4], data[5], 0x00, DATA_FRAME_TAIL};
     s = messageBus.sendAndWait(buf2, 8, &licensePlateNumberLowReturnCount);
     if (!s) {
         return false;
@@ -1138,7 +1147,7 @@ bool NetSynchronization::synchronousPathInformation(uint16_t* buf, uint8_t len) 
     logHex(buf, len);
     Serial.println();
 #endif
-    bool s = synchronousGlobalVariable(181, buf, inRand(len, 0, 32));
+    bool s = synchronousGlobalVariable(181, buf, clamp(len, 0, 32));
     if (!s) {
         return false;
     }
@@ -1150,10 +1159,12 @@ bool NetSynchronization::getPathInformation(uint16_t* buf, uint8_t maxLen, uint8
     if (!getGlobalVariable(180)) {
         return false;
     }
-    getGlobalVariable(179, buf, inRand(maxLen, 0, 32));
-    for (int i = 0; i < 32; ++i) {
+    uint8_t _len = clamp(maxLen, 0, 32);
+    getGlobalVariable(181, buf, _len);
+    for (int i = 0; i < _len; ++i) {
         if (buf[i] == 0) {
-            *len = i + 1;
+            *len = i;
+            break;
         }
     }
     return true;

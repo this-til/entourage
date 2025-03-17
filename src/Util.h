@@ -10,6 +10,7 @@
 
 #define tristate(v, min, z, max) v > 0 ? max : v < 0 ? min : z
 #define inRand(v, min, max) v >= min && v <= max
+#define clamp(v, min, max) v < min ? min : v > max ? max : v
 
 void logHex(uint8_t p);
 
@@ -107,7 +108,9 @@ uint16_t unpack(Pos pos);
  */
 uint16_t assembly(const char* str);
 
-void assembly(uint16_t* array, uint8_t len, const char* str);
+void analyze(uint16_t* array, uint8_t maxArrayLen, char* outStr, uint8_t maxStrLen);
+
+void assembly(const char* str, uint16_t* outArray, uint8_t maxArrayLen);
 
 /***
  * 排除source中的特殊字符，并且输出到out

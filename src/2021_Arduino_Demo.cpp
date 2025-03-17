@@ -55,6 +55,13 @@ void l_setup() {
 
 }
 
+/*
+void serialEvent() {
+    char data = Serial.read();
+    Serial3.write(data);
+}
+*/
+
 void l_loop() {
     yield();
 }
@@ -149,15 +156,65 @@ void uploadTaskBoard() {
 
 }
 
+uint8_t posVersion = 0;
+
+uint16_t pathDebug[32] = {};
+uint16_t forecastPathDebug[32] = {};
+char atrDebug[65] = {};
+
+void whenVarUpdated() {
+#if DE_BUG
+    if (posVersion != netSynchronization.globalVariableVersion[180]) {
+        posVersion = netSynchronization.globalVariableVersion[180];
+
+        uint8_t len = 0;
+        netSynchronization.getPathInformation(pathDebug, 32, &len);
+
+        /*Serial.print("obj?:");
+        Serial.print((uint32_t) &barrierGateA);
+        Serial.print(":");
+        Serial.print((uint32_t) allDeviceBase[barrierGateA.id]);
+        Serial.println();*/
+
+        Serial.print("[DEBUG] a new path data:");
+        Serial.print("  len:");
+        Serial.print(len);
+        Serial.print("  data(HEX)");
+        logHex(pathDebug, len);
+        Serial.print("  data(str):");
+        analyze(pathDebug, len, atrDebug, 65);
+        Serial.println(atrDebug);
+
+        uint16_t* _path = pathDebug + 2;
+        uint8_t _len = len - 3;
+
+
+        assembly("D4", forecastPathDebug, _len);
+        if (equals(_path, forecastPathDebug, _len)) {
+            Serial.print("D4");
+        }
+
+        assembly("B6", forecastPathDebug, _len);
+        if (equals(_path, forecastPathDebug, _len)) {
+            Serial.print("B6");
+        }
+
+    }
+#endif
+
+
+}
+
 void TaskCar::loop() {
     acceptZigbee();
     uploadTaskBoard();
+    whenVarUpdated();
 }
 
 uint16_t path[32] = {};
 uint16_t forecastPath[32] = {};
 uint8_t qrBuf[48] = {};
-uint8_t licensePlateBuf[6] = {};
+uint8_t licensePlateBuf[7] = "A12345";
 
 void questions5() {
     uint8_t len = 0;
@@ -224,30 +281,40 @@ void questions5() {
 
     car.trackTurnLeft();
 
-    barrierGateA.setLicensePlateData(licensePlateBuf);
-    /*while (!barrierGateA.getGateControl()) {
-        yield();
-    }*/
+    unsigned long startTime = millis();
+    while (millis() - startTime < 10000) {
+        barrierGateA.setLicensePlateData(licensePlateBuf);
+        CoreBeep.TurnOn();
+        sleep(1000);
+        CoreBeep.TurnOff();
+        if (barrierGateA.getGateControl()) {
+            break;
+        }
+    }
 
     car.trackAdvanceToNextJunction(); //B2->B4
 
-    car.turnLeft(45);
+    car.turnLeft(60);
     sleep(500);
     stereoscopicDisplayA.showLicensePlate(licensePlateBuf, 0, 0);
     sleep(500);
-    car.turnRight(45);
+    car.turnRight(60);
     car.trimCar();
 
     uint16_t* _path = path + 2;
     uint8_t _len = len - 3;
 
 
-    assembly(forecastPath, _len, "D4");
+    assembly("D4", forecastPath, _len);
     if (equals(_path, forecastPath, _len)) {
         car.trackTurnLeft();
         car.trackAdvanceToNextJunction(); //B4->D4
 
         netSynchronization.synchronousGlobalVariable('q', 0);
+        CoreBeep.TurnOn();
+        sleep(1000);
+        CoreBeep.TurnOff();
+
         car.trackTurnRight();
 
         car.trackAdvanceToNextJunction(); //D4->D6
@@ -256,10 +323,13 @@ void questions5() {
         car.trackTurnRight();
     }
 
-    assembly(forecastPath, _len, "B6");
+    assembly("B6", forecastPath, _len);
     if (equals(_path, forecastPath, _len)) {
         car.trackAdvanceToNextJunction(); //B4->B6
         netSynchronization.synchronousGlobalVariable('q', 0);
+        CoreBeep.TurnOn();
+        sleep(1000);
+        CoreBeep.TurnOff();
 
         car.turnLeft();
         car.recoil(500);
@@ -295,7 +365,7 @@ void questions5() {
         netSynchronization.synchronousGlobalVariable('h', 2);
         car.advanceCorrection(50, 6);
         car.recoilToNextJunction();
-        car.recoil(600);
+        //car.recoil(600);
     }
 }
 
@@ -324,7 +394,11 @@ void keyHandler(uint8_t k_value) {
             break;
         case 0x03:
 
+            barrierGateA.setLicensePlateData(licensePlateBuf);
 
+            netSynchronization.synchronousLicensePlateNumber((uint8_t*) "A12345");
+
+/*
             k230.setTrackModel(TRACK_MIDDLE);
             carportA.moveToLevel(1);
 
@@ -361,18 +435,18 @@ void keyHandler(uint8_t k_value) {
 
             DCMotor.Stop();
 
-            carportA.moveToLevel(3);
+            carportA.moveToLevel(3);*/
 
             break;
         case 0x04:
 
             //carTest.figureEightCycle();
-            k230.setCameraSteeringGearAngle(-55);
+            /*k230.setCameraSteeringGearAngle(-55);
             k230.setTrackModel(TRACK_MIDDLE);
 
             car.trackTurnLeft();
 
-            k230.setTrackModel(0);
+            k230.setTrackModel(0);*/
 
             break;
     }
