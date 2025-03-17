@@ -3,7 +3,7 @@
 //
 
 
-#define DE_BUG true
+#define DE_BUG false
 /*
 #define LOG_LEVEL 4  // 0=OFF,1=ERROR,2=WARN,3=INFO,4=DEBUG
 
@@ -32,12 +32,12 @@
 #include "Ultrasonic.h"
 #include "SCoop.h"
 
-#include "UltrasonicUtil.h"
 #include "2021_Arduino_Demo.h"
-#include "CarControl.h"
-#include "QrUtil.h"
 #include "Device.h"
 #include "Util.h"
+#include "Enum.h"
+#include "Test.h"
+#include "Cache.h"
 
 // 标准无符号类型
 #define uchar  unsigned char

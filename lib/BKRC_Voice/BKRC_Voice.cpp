@@ -13,12 +13,12 @@ _BKRC_Voice::~_BKRC_Voice()
 {
 }
 
-//³õÊ¼»¯
+//åˆå§‹åŒ–
 /************************************************************************************************************
-¡¾º¯ Êý Ãû¡¿£º	Initialization		³õÊ¼»¯º¯Êý
-¡¾²ÎÊýËµÃ÷¡¿£º	ÎÞ
-¡¾·µ »Ø Öµ¡¿£º	ÎÞ
-¡¾¼ò    Àý¡¿£º	Initialization();	³õÊ¼»¯Ïà¹Ø½Ó¿Ú¼°±äÁ¿
+ã€å‡½ æ•° åã€‘ï¼š	Initialization		åˆå§‹åŒ–å‡½æ•°
+ã€å‚æ•°è¯´æ˜Žã€‘ï¼š	æ— 
+ã€è¿” å›ž å€¼ã€‘ï¼š	æ— 
+ã€ç®€    ä¾‹ã€‘ï¼š	Initialization();	åˆå§‹åŒ–ç›¸å…³æŽ¥å£åŠå˜é‡
 ************************************************************************************************************/
 void _BKRC_Voice::Initialization(void)
 {
@@ -29,24 +29,24 @@ while(Serial.read() >=0);
 }
 
 /**********************************************************************
-   º¯ Êý Ãû £º  ¿ØÖÆÓïÒô²¥±¨±êÖ¾Îï²¥±¨ÓïÒô¿ØÖÆÃüÁî
-   ²Î    Êý £º  Primary   -> Ö÷Ö¸Áî
-                Secondary -> ¸±Ö°Áî
-                Ïê¼û¸½Â¼1
-   ·µ »Ø Öµ £º  ÎÞ
-   ¼ò    Àý £º  YY_Comm_Zigbee(0x20, 0x01);     // ÓïÒô²¥±¨Ëæ»úÓïÒôÃüÁî
+   å‡½ æ•° å ï¼š  æŽ§åˆ¶è¯­éŸ³æ’­æŠ¥æ ‡å¿—ç‰©æ’­æŠ¥è¯­éŸ³æŽ§åˆ¶å‘½ä»¤
+   å‚    æ•° ï¼š  Primary   -> ä¸»æŒ‡ä»¤
+                Secondary -> å‰¯èŒä»¤
+                è¯¦è§é™„å½•1
+   è¿” å›ž å€¼ ï¼š  æ— 
+   ç®€    ä¾‹ ï¼š  YY_Comm_Zigbee(0x20, 0x01);     // è¯­éŸ³æ’­æŠ¥éšæœºè¯­éŸ³å‘½ä»¤
 
-  ¸½Â¼1£º
+  é™„å½•1ï¼š
   -----------------------------------------------------------------------
-  | Primary | Secondary | ËµÃ÷
+  | Primary | Secondary | è¯´æ˜Ž
   |---------|-----------|------------------------------------------------
-  |  0x10   |  0x02     | ÃÀºÃÉú»î
-  |         |  0x03     | ÐãÀöÉ½ºÓ
-  |         |  0x04     | ×·ÖðÃÎÏë
-  |         |  0x05     | Ñï·«Æôº½
-  |         |  0x06     | ÆëÍ·²¢½ø
+  |  0x10   |  0x02     | ç¾Žå¥½ç”Ÿæ´»
+  |         |  0x03     | ç§€ä¸½å±±æ²³
+  |         |  0x04     | è¿½é€æ¢¦æƒ³
+  |         |  0x05     | æ‰¬å¸†å¯èˆª
+  |         |  0x06     | é½å¤´å¹¶è¿›
   |---------|-----------|------------------------------------------------
-  |  0x20   |  0x01     | Ëæ»úÖ¸Áî
+  |  0x20   |  0x01     | éšæœºæŒ‡ä»¤
   |---------|-----------|------------------------------------------------
 ***********************************************************************/
 void _BKRC_Voice::YY_Comm_Zigbee(uint8_t Primary, uint8_t Secondary)
@@ -65,38 +65,38 @@ void _BKRC_Voice::YY_Comm_Zigbee(uint8_t Primary, uint8_t Secondary)
 
 
 /**************************************************
-  ¹¦  ÄÜ£ºÓïÒôÊ¶±ðº¯Êý
-  ²Î  Êý£º  ÎÞ
-  ·µ»ØÖµ£º  ÓïÒô´ÊÌõID    ´ÊÌõÄÚÈÝ
+  åŠŸ  èƒ½ï¼šè¯­éŸ³è¯†åˆ«å‡½æ•°
+  å‚  æ•°ï¼š  æ— 
+  è¿”å›žå€¼ï¼š  è¯­éŸ³è¯æ¡ID    è¯æ¡å†…å®¹
 
-    0x01      ÃÀºÃÉú»î
+    0x01      ç¾Žå¥½ç”Ÿæ´»
 
-    0x02      ÐãÀöÉ½ºÓ
+    0x02      ç§€ä¸½å±±æ²³
 
-    0x03      ×·ÖðÃÎÏë
+    0x03      è¿½é€æ¢¦æƒ³
 
-    0x04      Ñï·«Æôº½
+    0x04      æ‰¬å¸†å¯èˆª
 
-    0x05      ÆëÍ·²¢½ø
+    0x05      é½å¤´å¹¶è¿›
 
-    0x00      Î´Ê¶±ðµ½´ÊÌõ/Ê¶±ð³¬Ê±
+    0x00      æœªè¯†åˆ«åˆ°è¯æ¡/è¯†åˆ«è¶…æ—¶
 **************************************************/
-uint8_t _BKRC_Voice::BKRC_Voice_Extern(uint8_t yy_mode)   // ÓïÒôÊ¶±ð
+uint8_t _BKRC_Voice::BKRC_Voice_Extern(uint8_t yy_mode)   // è¯­éŸ³è¯†åˆ«
 {
-  uint8_t SYN7318_Flag = 0;           // SYN7318ÓïÒôÊ¶±ðÃüÁîID±àºÅ
-  uint16_t timers = 0;               // ¼ÆÊýÖµ2
-  Serial2.write(start_voice_dis, 5); //·¢ËÍ¿ªÆôÓïÒôÊ¶±ðÖ¸Áî
+  uint8_t SYN7318_Flag = 0;           // SYN7318è¯­éŸ³è¯†åˆ«å‘½ä»¤IDç¼–å·
+  uint16_t timers = 0;               // è®¡æ•°å€¼2
+  Serial2.write(start_voice_dis, 5); //å‘é€å¼€å¯è¯­éŸ³è¯†åˆ«æŒ‡ä»¤
   delay(500);
   SYN7318_Flag = Voice_Drive();
-  while (Serial.read() >= 0); //Çå¿Õ´®¿ÚÊý¾Ý
+  while (Serial.read() >= 0); //æ¸…ç©ºä¸²å£æ•°æ®
   delay(1000);
   if(yy_mode==0)
   {
-  YY_Comm_Zigbee(0x20, 0x01);     //ÓïÒô²¥±¨Ëæ»úÓïÒôÃüÁî
+  YY_Comm_Zigbee(0x20, 0x01);     //è¯­éŸ³æ’­æŠ¥éšæœºè¯­éŸ³å‘½ä»¤
 
   }else
   {
-YY_Comm_Zigbee(0x10, yy_mode);     //ÓïÒô²¥±¨Ëæ»úÓïÒôÃüÁî
+YY_Comm_Zigbee(0x10, yy_mode);     //è¯­éŸ³æ’­æŠ¥éšæœºè¯­éŸ³å‘½ä»¤
   }
   
 
@@ -106,7 +106,7 @@ YY_Comm_Zigbee(0x10, yy_mode);     //ÓïÒô²¥±¨Ëæ»úÓïÒôÃüÁî
     delay(1);
     timers++;
     SYN7318_Flag = Voice_Drive();
-    if (SYN7318_Flag != 0x00 || timers > 6000) //ÅÐ¶Ï³¬Ê±ÍË³ö
+    if (SYN7318_Flag != 0x00 || timers > 6000) //åˆ¤æ–­è¶…æ—¶é€€å‡º
     {
       timers = 0;
       return SYN7318_Flag;
@@ -117,9 +117,9 @@ YY_Comm_Zigbee(0x10, yy_mode);     //ÓïÒô²¥±¨Ëæ»úÓïÒôÃüÁî
 
 
 /**************************************************
-  ¹¦  ÄÜ£ºÓïÒôÊ¶±ð»Ø´«ÃüÁî½âÎöº¯Êý
-  ²Î  Êý£º ÎÞ
-  ·µ»ØÖµ£º  ÓïÒô´ÊÌõID /Ð¡´´ÓïÒôÊ¶±ðÄ£¿é×´Ì¬
+  åŠŸ  èƒ½ï¼šè¯­éŸ³è¯†åˆ«å›žä¼ å‘½ä»¤è§£æžå‡½æ•°
+  å‚  æ•°ï¼š æ— 
+  è¿”å›žå€¼ï¼š  è¯­éŸ³è¯æ¡ID /å°åˆ›è¯­éŸ³è¯†åˆ«æ¨¡å—çŠ¶æ€
 **************************************************/
 uint8_t _BKRC_Voice::Voice_Drive(void)
 {

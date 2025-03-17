@@ -5,120 +5,165 @@
 #ifndef ENTOURAGE_CLION_DEVICE_H
 #define ENTOURAGE_CLION_DEVICE_H
 
+//哄老母鸡被迫留下来的痔疮代码
+#define FOR_THE_KING_HEN true
+
+#define DETECTED_VALUE_CHANGE(name)                                                                                     \
+unsigned long startTime = millis();                                                                                     \
+uint8_t name##Version = this->name##Version;                                                                            \
+while (millis() - startTime < 1000) {                                                                                   \
+    if(name##Version != this->name##Version) {                                                                          \
+        if ((name) != nullptr) {                                                                                        \
+            *(name) = this->name;                                                                                       \
+        }                                                                                                               \
+        return true;                                                                                                    \
+    }                                                                                                                   \
+    yield();                                                                                                            \
+}                                                                                                                       \
+return false;                                                                                                           \
+
+#define TWO_DETECTED_VALUE_CHANGE(name1, name2)                                                                         \
+unsigned long startTime = millis();                                                                                     \
+uint8_t name1##_##name2##Version = this->name1##_##name2##Version;                                                      \
+while (millis() - startTime < 1000) {                                                                                   \
+    if(name1##_##name2##Version != this->name1##_##name2##Version) {                                                    \
+        if ((name1) != nullptr) {                                                                                       \
+            *(name1) = this->name1;                                                                                     \
+        }                                                                                                               \
+        if ((name2) != nullptr) {                                                                                       \
+            *(name2) = this->name2;                                                                                     \
+        }                                                                                                               \
+        return true;                                                                                                    \
+    }                                                                                                                   \
+    yield();                                                                                                            \
+}                                                                                                                       \
+return false;                                                                                                           \
+
+#define THERE_DETECTED_VALUE_CHANGE(name1, name2, name3)                                                                \
+unsigned long startTime = millis();                                                                                     \
+    uint8_t name1##_##name2##_##name3##Version = this->name1##_##name2##_##name3##Version;                              \
+    while (millis() - startTime < 1000) {                                                                               \
+    if(name1##_##name2##_##name3##Version != this->name1##_##name2##_##name3##Version) {                                \
+        if ((name1) != nullptr) {                                                                                       \
+            *(name1) = this->name1;                                                                                     \
+        }                                                                                                               \
+        if ((name2) != nullptr) {                                                                                       \
+            *(name2) = this->name2;                                                                                     \
+        }                                                                                                               \
+        if ((name3) != nullptr) {                                                                                       \
+            *(name3) = this->name3;                                                                                     \
+        }                                                                                                               \
+        return true;                                                                                                    \
+    }                                                                                                                   \
+    yield();                                                                                                            \
+}                                                                                                                       \
+return false;                                                                                                           \
+
+
+#define UPDATE_VALUE(conditions, name, value)                                                                           \
+if (conditions) {                                                                                                       \
+    (name)=(value);                                                                                                     \
+    name##Version++;                                                                                                    \
+}                                                                                                                       \
+
+#define TWO_UPDATE_VALUE(conditions, name1, value1, name2, value2)                                                      \
+if (conditions) {                                                                                                       \
+    (name1)=(value1);                                                                                                   \
+    (name2)=(value2);                                                                                                   \
+    name1##_##name2##Version++;                                                                                         \
+}                                                                                                                       \
+
+
+#define THERE_UPDATE_VALUE(conditions, name1, value1, name2, value2, name3, value3)                                     \
+if (conditions) {                                                                                                       \
+    (name1)=(value1);                                                                                                   \
+    (name2)=(value2);                                                                                                   \
+    (name3)=(value3);                                                                                                   \
+    name1##_##name2##_##name3##Version++;                                                                               \
+}                                                                                                                       \
+
+
+#define VALUE_VERSION(type, name)                                                                                       \
+type name;                                                                                                              \
+uint8_t name##Version;                                                                                                  \
+
+#define TWO_VALUE_VERSION(type1, name1, type2, name2)                                                                   \
+type1 name1;                                                                                                            \
+type2 name2;                                                                                                            \
+uint8_t name1##_##name2##Version;                                                                                       \
+
+#define THERE_VALUE_VERSION(type1, name1, type2, name2, type3, name3)                                                   \
+type1 name1;                                                                                                            \
+type2 name2;                                                                                                            \
+type3 name3;                                                                                                            \
+uint8_t name1##_##name2##_##name3##Version;                                                                             \
+
+
 #include "def.h"
+#include "Enum.h"
+#include "Cache.h"
+#include <stdio.h>
 
-/***
- * 天气
- */
-enum Weather {
-    /***
-     * 大风
-     */
-    GALE = 0x00,
 
-    /***
-     * 多云
-     */
-    CLOUDY = 0x01,
+void logObj(enum Weather weather);
 
-    /***
-     * 晴
-     */
-    SUNNY = 0x02,
+void logObj(enum TextEncodingFormat textEncodingFormat);
 
-    /***
-     * 小雪
-     */
-    LIGHT_SNOW = 0x03,
+void logObj(enum TimingMode timingMode);
 
-    /***
-     * 小雨
-     */
-    SPIT = 0x04,
+void logObj(enum TrafficLightModel trafficLightModel);
 
-    /***
-     * 阴天
-     */
-    OVERCAST_SKY = 0x05
+void logObj(enum K210Color k210Color);
+
+TrafficLightModel k230ColorToTrafficLightModel(K210Color k210Color);
+
+void deviceSetup();
+
+class MessageBus {
+public:
+    uint8_t computeVerify(const uint8_t* buf, uint8_t len);
+
+    void addVerify(uint8_t* buf, uint8_t len);
+
+    void send(uint8_t* buf, uint8_t len, uint16_t bus = 0x6008, bool addVerify = true, unsigned long sendCoolingMs = 300);
+
+    bool sendAndWait(uint8_t* buf, uint8_t len, const uint8_t* returnCount, uint16_t bus = 0x6008, bool addVerify = true, unsigned long sendCoolingMs = 300, unsigned long maxWaitingTimeMs = 5000);
+
+    bool check(const uint8_t* buf, uint8_t len, uint8_t id, const uint8_t* serviceId, uint8_t serviceLen, bool verify = true);
+
+    bool check(const uint8_t* buf, uint8_t len, uint8_t id, uint8_t serviceId, bool verify = true);
+
+    bool awaitReturn(uint8_t* buf, uint8_t len, uint8_t id, const uint8_t* serviceId, uint8_t serviceLen, uint16_t bus = 0x6008, bool verify = true, unsigned long readOutTimeMs = 1000);
+
+    bool awaitReturn(uint8_t* buf, uint8_t len, uint8_t id, uint8_t serviceId, uint16_t bus = 0x6008, bool verify = true, unsigned long readOutTimeMs = 1000);
+
+protected:
+    unsigned long lastSentTime = 0;
 };
-
-/***
- * 文本编码格式
- */
-enum TextEncodingFormat {
-    GB2312 = 0x00,
-    GBK = 0x01,
-    BIG5 = 0x02,
-    Unicode = 0x03,
-};
-
-enum TimingMode {
-    TIMING_OFF = 0x00,
-    TIMING_ON = 0x01,
-    CLOCK_RESET = 0x02,
-};
-
-enum TrafficLightModel {
-    RED = 0x01,
-    GREEN = 0x02,
-    YELLOW = 0x03,
-};
-
-enum K210Color {
-    K_NONE = 0x00,
-    K_WHITE = 0x01,
-    K_BLACK = 0x02,
-    K_RED = 0x03,
-    K_GREEN = 0x04,
-    K_YELLOW = 0x05,
-};
-
-void logObj(Weather weather);
-
-void logObj(TextEncodingFormat textEncodingFormat);
-
-void logObj(TimingMode timingMode);
-
-void logObj(TrafficLightModel trafficLightModel);
-
-void logObj(K210Color k210Color);
 
 class DeviceBase {
 public:
     explicit DeviceBase(uint8_t id);
 
-    void send(uint8_t* buf);
+    /***
+     * 当受到zigbee消息，并且帧头id==设备id
+     * @param buf
+     */
+    virtual void onReceiveZigbeeMessage(uint8_t buf[]);
 
-    bool check(const uint8_t* buf, const uint8_t* serviceId, uint8_t serviceLen);
-
-    bool awaitReturn(uint8_t buf[], const uint8_t* serviceId, uint8_t serviceLen);
-
-    bool check(const uint8_t* buf, uint8_t serviceId);
-
-    bool awaitReturn(uint8_t buf[], uint8_t serviceId);
-
-protected:
     uint8_t id;
-
-    uint16_t sendBus;
-    uint8_t sendLen;
-    bool sendVerify;
-    int32_t sendCooling_ms;
-
-    uint16_t readBus;
-    uint8_t readLen;
-    bool readVerify;
-    bool readTailIntegrity;
-    unsigned long readOutTime_ms;
-
-    bool debug;
 };
 
 /***
  * 报警台
  */
-class AlarmDesk : DeviceBase {
+class AlarmDesk : public DeviceBase {
 public:
+
+    VALUE_VERSION(uint8_t, rescuePosition)
+
+    void onReceiveZigbeeMessage(uint8_t* buf) override;
+
     explicit AlarmDesk(uint8_t id);
 
     /***
@@ -129,22 +174,19 @@ public:
     /***
      * 获取救援位置
      */
-    uint8_t getRescuePosition();
+    bool getRescuePosition(uint8_t* rescuePosition);
 
-    /***
-     * debug
-     * 设置开启码
-     * @param data[] len=6
-     */
-    void setOpenCode(uint8_t data[]);
-
+    void setOpenCode(uint8_t* data);
 };
 
 /***
  * 智能道闸标控制
  */
-class BarrierGate : DeviceBase {
+class BarrierGate : public DeviceBase {
 public:
+    VALUE_VERSION(bool, gateControl)
+
+
     explicit BarrierGate(uint8_t id);
 
     /***
@@ -154,17 +196,37 @@ public:
     void setGateControl(bool open);
 
     /***
+     * debug
+     * 设置初始角度
+     *
+     * @param isUp true 闸门上升
+     */
+    void setInitialPos(bool isUp);
+
+    /***
+     * 发送车牌
+     * @param data len = 6
+     * @return
+     */
+    void setLicensePlateData(uint8_t* data);
+
+    /***
      * 获取门闸
      * "智能道闸标志物处于关闭状态时请求回传状态，不会回传任何指令。"
      */
     bool getGateControl();
+
 };
 
 /***
  * 公交站
  */
-class BusStop : DeviceBase {
+class BusStop : public DeviceBase {
 public:
+    THERE_VALUE_VERSION(uint8_t, yy, uint8_t, MM, uint8_t, dd)
+    THERE_VALUE_VERSION(uint8_t, HH, uint8_t, mm, uint8_t, ss)
+    TWO_VALUE_VERSION(Weather, weather, uint8_t, temperature)
+
     explicit BusStop(uint8_t id);
 
     /***
@@ -242,19 +304,21 @@ public:
        */
     void recoverSynthesizingLanguage();
 
+    void onReceiveZigbeeMessage(uint8_t* buf) override;
+
 };
 
 
 /***
  *  智能显示标志物控制
  */
-class Monitor : DeviceBase {
+class Monitor : public DeviceBase {
 public:
     explicit Monitor(int id);
 
     /***
      * 设置数码管显示指定数据
-     * @param pos 第几个数码管 1:第一排 2:第二排
+     * @param pos 第几排数码管 1:第一排 2:第二排
      * @param value[] 值 0~9 长度6
      */
     void setDisplayData(uint8_t pos, const uint8_t value[]);
@@ -275,15 +339,18 @@ public:
 /***
  * 智能立体车库
  */
-class Carport : DeviceBase {
+class Carport : public DeviceBase {
 
 public:
+
+    VALUE_VERSION(uint8_t, level)
+    TWO_VALUE_VERSION(bool, ventral, bool, rearSide)
 
     explicit Carport(uint8_t id);
 
     /***
     * 将车库移动到指定层
-    * @param level 指定层
+    * @param level 指定层 [1,4]
     */
     void moveToLevel(uint8_t level);
 
@@ -296,10 +363,12 @@ public:
 
     /***
     * 获取车库前后侧红外状态
-    * @param ventral out 前侧
+    * @param ventral out 前侧 (true 表示有东西遮挡)
     * @param rearSide out 后侧
     */
-    void getInfraredState(bool* ventral, bool* rearSide);
+    bool getInfraredState(bool* ventral, bool* rearSide);
+
+    void onReceiveZigbeeMessage(uint8_t* buf) override;
 
 
 };
@@ -307,7 +376,7 @@ public:
 /***
  * 智能交通信号灯
  */
-class TrafficLight : DeviceBase {
+class TrafficLight : public DeviceBase {
 public:
     explicit TrafficLight(uint8_t id);
 
@@ -323,41 +392,209 @@ public:
 
 };
 
+
 /***
  * 路灯
  */
-class StreetLamp : DeviceBase {
+class StreetLamp : public DeviceBase {
 public:
     explicit StreetLamp(uint8_t id);
 
     //TODO 无线通信
+
+    void setLightSourceIntensity(LightSourceIntensity lightSourceIntensity);
+};
+
+
+/***
+ * 无线充电
+ */
+class WirelessCharging : public DeviceBase {
+public:
+    explicit WirelessCharging(uint8_t id);
+
+    /***
+     * debug
+     * 开启无线充电模式
+     * 之后调用openWirelessCharging
+     * @param open
+     */
+    void setOpenWirelessCharging(bool open);
+
+    /***
+     * 开启无线充电
+     * @param openCode len = 3
+     */
+    void openWirelessCharging(uint8_t* openCode);
+
+
+    /***
+     * debug
+     * @param openCode len = 3
+     */
+    void setWirelessChargingOpenCode(uint8_t* openCode);
 };
 
 /***
- * 信息显示物(广告牌)
+ * 信息显示物
  */
-class AdvertisingBoard : DeviceBase {
+class InformationDisplay : public DeviceBase {
+public:
+    explicit InformationDisplay(uint8_t id);
+
+    /***
+     * 显示指定图片
+     * @return
+     */
+    void showSpecifiedPicture(uint8_t id);
+
+    /***
+     * 设置翻页模式
+     */
+    void setThePageTurningMode(PageTurningMode pageTurningMode);
+
+    /***
+     * 显示车牌
+     * @param licensePlate len = 6
+     */
+    void showLicensePlate(uint8_t* licensePlate);
+
+    /***
+     * 设置显示模式
+     * @param timingMode
+     */
+    void setTimingMode(InformationDisplayTimingMode timingMode);
+
+    /***
+     * 显示数据
+     * @param data len = 3 (十进制仅两位有效，但还是给3长度)
+     */
+    void showData(uint8_t* data, BaseFormat baseFormat);
+
+    /***
+     * 显示交通标志
+     * @param trafficSigns
+     */
+    void showTrafficSigns(TrafficSign trafficSigns);
 
 };
 
-struct QrMessage {
-    bool efficient;
+class ETC : public DeviceBase {
 
-    K210Color qrColor = K_WHITE;
+public:
+    explicit ETC(uint8_t id);
 
     /***
-     * 二维码信息容器
+    * debug
+    * 设置初始角度
+    *
+    * @param true 闸门上升
+    */
+    void setInitialPos(bool lUp, bool rUp);
+
+    //TODO 回传接收
+};
+
+
+class StereoscopicDisplay : public DeviceBase {
+public:
+    explicit StereoscopicDisplay(uint8_t id);
+
+
+    /***
+     *
+     * @param licensePlate len = 6
+     * @param x 横坐标
+     * @param y 纵坐标
      */
-    uint8_t* message;
+    void showLicensePlate(uint8_t* licensePlate, uint8_t x, uint8_t y);
+
+    /***
+     * 显示距离
+     * @param value 距离
+     */
+    void showDistance(uint8_t value);
+
+    /***
+     * 显示"图形"
+     */
+    void showGraphText(Graph graph);
+
+    /***
+     * //设置显示颜色
+     * 显示“颜色”
+     */
+    void showColorText(StereoscopicDisplayColor stereoscopicDisplayColor);
+
+    /***
+     * 交通警示牌
+     */
+    void showTrafficWarningSigns(TrafficWarningSigns trafficWarningSigns);
+
+    /***
+     * 显示交通标识牌
+     */
+    void showTrafficSign(TrafficSign trafficSign);
+
+    /***
+     * 显示默认信息
+     */
+    void showDefaultInformation();
+
+    /***
+     * 设置文字颜色
+     */
+    void setTextColor(uint8_t r, uint8_t g, uint8_t b);
+
+    /***
+     * 显示文字 GBK
+     */
+    void showText(const uint16_t* gbk, uint8_t len);
+
+    void showTextByZigBee(const uint16_t* gbk, uint8_t len);
+
+};
+
+class UltrasonicDevice {
+public:
+
+/***
+ * 超声波测距
+ * @return 测得距离
+ */
+    double ranging(int sys = CM, int rangeFrequency = 5, int wait = 30);
+
+/***
+ * 通过超声波测距控制测距
+ * 该操作会暂停小车
+ * @param carSeep 车速
+ * @param distance 距离
+ * @param errorMargin 允许的误差
+ * @param controlTime_ms 调整时间，如果超过时间无论有没有到指定距离都将退出函数
+ * @return 如果true表示调整到指定距离
+ */
+    void adjustDistance(uint8_t carSeep, uint8_t targetDistance, double errorMargin = 0.2, unsigned long controlTime_ms = 2000, int wait = 30);
+};
+
+struct QrMessage {
+
+    /***
+ * 二维码信息容器
+ */
+    uint8_t* message = nullptr;
 
     uint8_t messageMaxLen = 0;
 
     uint8_t messageLen = 0;
+
+    bool efficient{};
+
+    K210Color qrColor = K_WHITE;
 };
+
 
 class K230 : DeviceBase {
 public:
-
 
     explicit K230(uint8_t id);
 
@@ -373,23 +610,19 @@ public:
     /***
     * 设置寻迹是否开启
     */
-    void setTrackModel(bool open);
+    void setTrackModel(uint8_t model);
+
+    void setTrackModel(const TrackModel trackModel[], uint8_t len);
+
+    uint8_t getTrackModelCache();
 
     /***
      * 获取寻迹标志位
-     * 高八位为靠近中心点
-     * 该函数需要开启寻迹
      *
+     *  @param result len = 6 | nullptr
      * @return
      */
-    bool getTrackFlagBit(uint8_t* trackFlagBitHigh, uint8_t* trackFlagBitLow);
-
-    /***
-     * 16版本
-     * @param flagBitHigh
-     * @return
-     */
-    bool getTrackFlagBit(uint16_t* flagBitHigh);
+    bool getTrackFlagBit(uint8_t* result);
 
     /***
      *
@@ -412,7 +645,7 @@ public:
      * @param maxRetry 最大重试次数
      * @return
      */
-    bool trafficLightRecognize_rigorous(K210Color* k210Color, uint16_t consecutiveEqualDegree = 3, uint16_t maxRetry = 48);
+    bool trafficLightRecognize_rigorous(K210Color* k210Color, uint16_t consecutiveEqualDegree = 3, uint16_t maxRetry = 24);
 
     /***
      * 测试连接用的
@@ -423,27 +656,29 @@ public:
     //void loop();
 
 private:
+    uint8_t trackModel{};
     bool receiveTrack;
-    int8_t cameraSteeringGearAngle;
+    int8_t cameraSteeringGearAngle{};
 };
 
-struct TrackResult {
-    uint8_t flagBitArray[2] = {};
+struct TrackRowResult {
+    uint8_t* flagBitArray;
     uint16_t flagBit;
     float offset;
     uint8_t bitCount;
     uint8_t centerBitCount;
     uint8_t edgeBitCount;
-
 };
 
 /***
  * 你的小车车
  * 一些和车有关的，杂七杂八的就扔在这里
  */
-class Car {
+class Car : public DeviceBase {
 public:
-    Car();
+    explicit Car(uint8_t id);
+
+    void carSleep(uint16_t time);
 
     /***
      * 清除车的码盘值
@@ -465,7 +700,23 @@ public:
  * 直行到下一个路口
  * @param carSpeed
  */
-    void trackAdvance();
+    void trackAdvanceToNextJunction();
+
+    /***
+     * 直行到下一个路口
+     */
+    void advanceToNextJunction();
+
+    /***
+     * 通过特殊地形
+     * 然后调用advanceToNextJunction
+     */
+    void overspecificRelief();
+
+    /***
+     * 倒车寻迹到下一个路口
+     */
+    void recoilToNextJunction();
 
     /***
      * 前进一段距离
@@ -479,55 +730,193 @@ public:
  */
     void recoil(uint16_t distance);
 
-    void trackTurnLeft(bool trimCar = true);
+    void trackTurnLeft();
 
-    void trackTurnRight(bool trimCar = true);
+    void trackTurnRight();
 
-    void turnLeft(bool trimCar);
+    void turnLeft(uint8_t angle = 90);
 
-    void turnRight(bool trimCar);
+    void turnRight(uint8_t angle = 90);
 
     /***
      * 微调车姿态
      */
     void trimCar();
 
+    void trimCar(TrackRowResult* trackRowResult, float offset);
+
+    /***
+     * 矫正车身，与寻迹线平行
+     */
+    void rightCar();
+
+    /***
+     * 前进式调整
+     * @param step
+     */
+    void advanceCorrection(uint16_t step, uint8_t maximumFrequency);
+
+    /***
+     * 来回式调整
+     * @param step
+     */
+    void mobileCorrection(uint16_t step);
+
     bool acceptTrackFlag();
 
-    int16_t straightLineSpeed;
-    int16_t turnLeftSpeed;
-    int16_t turnRightSpeed;
-    int16_t straightLineKpSpeed;
-    int16_t trimKpSpeed;
 
-    // PID 控制参数（车体校正时用的）——作为类成员便于调试和参数调整
-    float _trimAttitudeKpSpeed{};  // 比例系数
-    float _trimAttitudeKiSpeed{};  // 积分系数
-    float _trimAttitudeKdSpeed{};  // 微分系数
+/***
+ * led闪烁
+ */
+    void ledShine(int number, int wait);
 
-    unsigned long trimOutTime_ms;
-    unsigned long outTime_ms;
+    void onReceiveZigbeeMessage(uint8_t* buf) override;
+
+    int16_t straightSpeed = 20;
+    int16_t turningSpeed = 40;
+    int16_t straightLineKpSpeed = 60;
+
+    unsigned long trimOutTimeMs = 1000;
+    unsigned long outTimeMs = 20000;
+
 
 private:
-    // PID 状态变量：用于跨循环累积（每次 trimCar 调用开始时会重置）
-    float pid_integral{};
-    float lastError{};
-
-    TrackResult trackResult{};
+    uint8_t flagBitArray[6] = {};
+    TrackRowResult trackRowResultHigh{flagBitArray + 0};
+    TrackRowResult trackRowResult{flagBitArray + 2};
+    TrackRowResult trackRowResultLow{flagBitArray + 3};
 
     void rotationProcess();
 
     /***
      * 等待码盘
-     * @param 等待码盘的变化量达到指定值(不检测正反)
+     * @param distance 等待码盘的变化量达到指定值
      */
-    void waitCodeDisc(uint16_t distance);
+    void waitCodeDisc(int16_t distance);
+
+    void acceptTrackRowFlag(TrackRowResult* trackRowResult);
 };
 
+class MainCar : public DeviceBase {
+public:
+    explicit MainCar(uint8_t id);
+
+
+    void onReceiveZigbeeMessage(uint8_t* buf) override;
+
+};
+
+class NetSynchronization {
+public:
+
+    /***
+     * 全局变量
+     */
+    uint16_t globalVariable[256] = {};
+    uint8_t globalVariableVersion[256] = {};
+
+    uint8_t globalVariableReturnCount = 0;
+
+    /***
+    * 自动同步一个全局数据
+    * @param name [0,255]
+    * @param value
+    */
+    bool synchronousGlobalVariable(uint8_t name, uint16_t value);
+
+    /***
+     * 同步连续的数据
+     */
+    bool synchronousGlobalVariable(uint8_t name, uint16_t* value, uint8_t len);
+
+    bool synchronousGlobalVariable(uint8_t name, uint8_t* value, uint8_t len);
+
+    uint16_t getGlobalVariable(uint8_t name);
+
+    void getGlobalVariable(uint8_t name, uint16_t* buf, uint8_t len);
+
+    void getGlobalVariable(uint8_t name, uint8_t* buf, uint8_t len);
+
+
+#if FOR_THE_KING_HEN
+    uint8_t licensePlateNumberHighReturnCount = 0;
+
+    uint8_t licensePlateNumberLowReturnCount = 0;
+#endif
+
+    /***
+     * 同步车牌号信息
+     * 校验地址:173
+     * 起始地址位:174
+     * 数据长度:6
+     * @param data len = 6
+     * @return
+     */
+    bool synchronousLicensePlateNumber(uint8_t* data);
+
+    /***
+     * 获取车牌号信息
+     * @param buf len = 6
+     * @return 是否是有效信息
+     */
+    bool getLicensePlateNumber(uint8_t* buf);
+
+    /***
+     * 同步路径信息
+     * 校验地址:180
+     * 起始地址:181
+     * 最大长度:32
+     */
+    bool synchronousPathInformation(uint16_t* buf, uint8_t len);
+
+    bool getPathInformation(uint16_t* buf, uint8_t maxLen, uint8_t* len);
+
+    /***
+     * 获取主车位置
+     * 地址:213
+     * @return
+     */
+    uint16_t getMainCarPos();
+
+    /***
+     * 同步从车位置
+     * @return
+     */
+    bool synchronousEntourageCarPos(uint16_t pos);
+
+    /***
+     * 获取从车位置
+     * 地址:214
+     * @return
+     */
+    uint16_t getEntourageCarPos();
+
+};
+
+
 /***
- * 报警台
+ * 你的沙盘，来着蒸汽宏伟之力的自动驾驶
  */
-extern AlarmDesk alarmDeskA;
+class SandTable {
+
+public:
+    /***
+     * 调用前进仅能前进到下一个路口，x,y偶数位置必定组成路口，不会要求停在非路口
+     * @param startPosition
+     * @param startDirection
+     * @param endPos
+     * @param endDirection
+     */
+    void moveTo(struct Pos startPosition, enum Direction startDirection, struct Pos endPos, enum Direction* endDirection);
+
+    void adjustDirection(struct Pos pos, enum Direction current, enum Direction target);
+
+    void move(struct Pos a, struct Pos b);
+};
+
+extern DeviceBase* allDeviceBase[256];
+
+extern MessageBus messageBus;
 
 /***
  * 智能道闸标控制
@@ -540,7 +929,7 @@ extern BarrierGate barrierGateA;
 extern BusStop busStopA;
 
 /***
- *  智能显示标志物控制
+ *  智能显示(大屏)
  */
 extern Monitor monitorA;
 
@@ -558,19 +947,59 @@ extern TrafficLight trafficLightB;
 extern TrafficLight trafficLightC;
 extern TrafficLight trafficLightD;
 
+
+/***
+ * 无线充电
+ */
+extern WirelessCharging wirelessChargingA;
+
+/***
+ * 信息显示
+ */
+extern InformationDisplay informationDisplayA;
+extern InformationDisplay informationDisplayB;
+extern InformationDisplay informationDisplayC;
+
+//===============红外==============
+
+/***
+ * 报警台
+ */
+extern AlarmDesk alarmDeskA;
+
 /***
  * 路灯
  */
 extern StreetLamp streetLampA;
 
 /***
+ * 立体显示物
+ */
+extern StereoscopicDisplay stereoscopicDisplayA;
+//==============other==============
+
+extern UltrasonicDevice ultrasonicDevice;
+
+/***
  * 摄像头
  */
 extern K230 k230;
+
+extern NetSynchronization netSynchronization;
+
 /***
  * 你的小车车
  */
 extern Car car;
 
+extern MainCar mainCar;
+
+extern SandTable sandTable;
+
+//==============总览==============
+
+
 
 #endif //ENTOURAGE_CLION_DEVICE_H
+
+

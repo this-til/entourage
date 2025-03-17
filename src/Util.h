@@ -10,10 +10,21 @@
 
 #define tristate(v, min, z, max) v > 0 ? max : v < 0 ? min : z
 #define inRand(v, min, max) v >= min && v <= max
+#define clamp(v, min, max) v < min ? min : v > max ? max : v
 
 void logHex(uint8_t p);
 
+void logHex(uint16_t p);
+
 void logHex(const uint8_t* p, uint16_t len);
+
+void logHex(const uint16_t* p, uint16_t len);
+
+void logBool(bool b);
+
+void logBin(uint8_t data);
+
+bool equals(uint16_t* a, uint16_t* b, uint8_t len);
 
 uint32_t countBits(const uint8_t* value, uint32_t len);
 
@@ -28,6 +39,7 @@ uint32_t countBits(const uint8_t* value, uint32_t len);
 uint32_t countBits(const uint8_t* value, uint32_t len, uint32_t starting, uint32_t end);
 
 uint32_t countBits(uint8_t uint8);
+
 
 /***
  * 获取某位的bit
@@ -80,5 +92,37 @@ void lonelinessExclusion(uint8_t* value, uint32_t len, uint8_t* outValue);
  */
 float centralPoint(uint8_t* value, uint32_t len, float* centerShift, float* centerShiftOne);
 
+struct Pos {
+    uint8_t x;
+    uint8_t y;
+};
+
+Pos pack(uint16_t v);
+
+uint16_t unpack(Pos pos);
+
+/***
+ * 将两位字符串组合成uint16_t
+ * "F1" -> 'F' << 8 | '1'
+ * @return
+ */
+uint16_t assembly(const char* str);
+
+void analyze(uint16_t* array, uint8_t maxArrayLen, char* outStr, uint8_t maxStrLen);
+
+void assembly(const char* str, uint16_t* outArray, uint8_t maxArrayLen);
+
+/***
+ * 排除source中的特殊字符，并且输出到out
+ */
+void excludeSpecialCharacter(const uint8_t* source, uint8_t sourceLen, uint8_t* out, uint8_t outLen, uint8_t* specialNumber = nullptr);
+
+/***
+ * 表达式求值
+ * @param expression 例如 ((n*y+h)^4)/100
+ * @param variable 长度为256的数组 使用variable['n']获取变量
+ * @return
+ */
+int16_t evaluateTheExpression(const uint8_t* expression, uint16_t variable[]);
 
 #endif //ENTOURAGE_CLION_UTIL_H

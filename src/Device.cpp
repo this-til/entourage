@@ -4,44 +4,63 @@
 
 #include "Device.h"
 
-DeviceBase::DeviceBase(uint8_t id) {
-    this->id = id;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
 
-    this->sendBus = 0x6008;
-    this->sendLen = 8;
-    this->sendVerify = true;
-    this->sendCooling_ms = 300;
+DeviceBase* allDeviceBase[256] = {};
 
-    this->readBus = 0x6100;
-    this->readLen = 8;
-    this->readVerify = true;
-    this->readTailIntegrity = true;
-    this->readOutTime_ms = 500;
 
-    this->debug = true;
+void deviceSetup() {
+    allDeviceBase[barrierGateA.id] = &barrierGateA;
+    allDeviceBase[busStopA.id] = &busStopA;
+    allDeviceBase[monitorA.id] = &monitorA;
+    allDeviceBase[carportA.id] = &carportA;
+    allDeviceBase[carportB.id] = &carportB;
+    allDeviceBase[trafficLightA.id] = &trafficLightA;
+    allDeviceBase[trafficLightB.id] = &trafficLightB;
+    allDeviceBase[trafficLightC.id] = &trafficLightC;
+    allDeviceBase[trafficLightD.id] = &trafficLightD;
+    allDeviceBase[wirelessChargingA.id] = &wirelessChargingA;
+    allDeviceBase[informationDisplayA.id] = &informationDisplayA;
+    allDeviceBase[informationDisplayB.id] = &informationDisplayB;
+    allDeviceBase[informationDisplayC.id] = &informationDisplayC;
+    allDeviceBase[alarmDeskA.id] = &alarmDeskA;
+    allDeviceBase[streetLampA.id] = &streetLampA;
+    allDeviceBase[stereoscopicDisplayA.id] = &stereoscopicDisplayA;
+    allDeviceBase[mainCar.id] = &mainCar;
+    allDeviceBase[car.id] = &car;
 }
 
-void DeviceBase::send(uint8_t* buf) {
-    if (sendVerify) {
-        uint32_t com = 0;
-        for (uint8_t i = 2; i < sendLen - 2; i++) {
-            com += buf[i];
-        }
-        buf[sendLen - 2] = static_cast<int8_t>(com % 256);
+uint8_t MessageBus::computeVerify(const uint8_t* buf, uint8_t len) {
+    uint8_t com = 0;
+    for (uint8_t i = 2; i < len - 2; i++) {
+        com += buf[i];
+    }
+    return com;
+}
+
+void MessageBus::addVerify(uint8_t* buf, uint8_t len) {
+    buf[len - 2] = computeVerify(buf, len);
+}
+
+void MessageBus::send(uint8_t* buf, uint8_t len, uint16_t bus, bool _addVerify, unsigned long sendCoolingMs) {
+    if (millis() - lastSentTime < sendCoolingMs) {
+        sleep(sendCoolingMs - (millis() - lastSentTime));
+    }
+    lastSentTime = millis();
+
+    if (_addVerify) {
+        addVerify(buf, len);
     }
 #if DE_BUG
     Serial.print("[DEBUG] send:");
-    logHex(buf, sendLen);
+    logHex(buf, len);
     Serial.println();
 #endif
-    ExtSRAMInterface.ExMem_Write_Bytes(sendBus, buf, sendLen);
-
-    if (sendCooling_ms) {
-        sleep(sendCooling_ms);
-    }
+    ExtSRAMInterface.ExMem_Write_Bytes(bus, buf, len);
 }
 
-bool DeviceBase::check(const uint8_t* buf, const uint8_t* serviceId, uint8_t serviceLen) {
+bool MessageBus::check(const uint8_t* buf, uint8_t len, uint8_t id, const uint8_t* serviceId, uint8_t serviceLen, bool verify) {
     if (buf[0] != DATA_FRAME_HEADER) {
 #if DE_BUG
         Serial.print("  inaccuracy header:");
@@ -49,14 +68,16 @@ bool DeviceBase::check(const uint8_t* buf, const uint8_t* serviceId, uint8_t ser
 #endif
         return false;
     }
-    if (readTailIntegrity && buf[readLen - 1] != DATA_FRAME_TAIL) {
+
+    if (buf[len - 1] != DATA_FRAME_TAIL) {
 #if DE_BUG
         Serial.print("  inaccuracy tail:");
-        logHex(buf[readLen - 1]);
+        logHex(buf[len - 1]);
         Serial.println("    check failure...");
 #endif
         return false;
     }
+
     if (buf[1] != id) {
 #if DE_BUG
         Serial.println("  inaccuracy device:");
@@ -65,6 +86,7 @@ bool DeviceBase::check(const uint8_t* buf, const uint8_t* serviceId, uint8_t ser
 #endif
         return false;
     }
+
     for (int i = 0; i < serviceLen; ++i) {
         if (buf[2 + i] != serviceId[i]) {
 #if DE_BUG
@@ -79,19 +101,15 @@ bool DeviceBase::check(const uint8_t* buf, const uint8_t* serviceId, uint8_t ser
         }
     }
 
-    if (readVerify) {
-        uint32_t com = 0;
-        for (uint8_t i = 1; i < readLen - 2; i++) {
-            com += buf[i];
-        }
-        auto checksum = uint8_t(com % 256);
-        if (buf[readLen - 2] != checksum) {
+    if (verify) {
+        uint8_t checksum = computeVerify(buf, len);
+        if (buf[len - 2] != checksum) {
 #if DE_BUG
             Serial.print("  inaccuracy checksum:");
             Serial.print("predict:");
             logHex(checksum);
             Serial.print(",source:");
-            logHex(buf[readLen - 2]);
+            logHex(buf[len - 2]);
             Serial.println("    check failure...");
 #endif
             return false;
@@ -100,28 +118,33 @@ bool DeviceBase::check(const uint8_t* buf, const uint8_t* serviceId, uint8_t ser
 #if DE_BUG
     Serial.println("    check successful...");
 #endif
+
     return true;
 }
 
+bool MessageBus::check(const uint8_t* buf, uint8_t len, uint8_t id, uint8_t serviceId, bool verify) {
+    return check(buf, len, id, &serviceId, 1, verify);
+}
 
-bool DeviceBase::awaitReturn(uint8_t* buf, const uint8_t* serviceId, uint8_t serviceLen) {
+bool MessageBus::awaitReturn(uint8_t* buf, uint8_t len, uint8_t id, const uint8_t* serviceId, uint8_t serviceLen, uint16_t bus, bool verify, unsigned long readOutTimeMs) {
     unsigned long startTime = millis();
 
 #if DE_BUG
     Serial.println("[DEBUG] awaitReturn...");
 #endif
-    while (millis() - startTime < readOutTime_ms) {
-        if (ExtSRAMInterface.ExMem_Read(readBus) == 0x00) {
+    while (millis() - startTime < readOutTimeMs) {
+        if (ExtSRAMInterface.ExMem_Read(bus) == 0x00) {
             continue;
         }
-        ExtSRAMInterface.ExMem_Read_Bytes(readBus, buf, readLen);
+        ExtSRAMInterface.ExMem_Read_Bytes(bus, buf, len);
 #if DE_BUG
         Serial.print("[DEBUG] read:");
-        logHex(buf, readLen);
+        logHex(buf, len);
 #endif
-        if (check(buf, serviceId, serviceLen)) {
+        if (check(buf, len, id, serviceId, serviceLen, verify)) {
             return true;
         }
+        yield();
     }
 #if DE_BUG
     Serial.println("[WARN] outTime...");
@@ -129,16 +152,37 @@ bool DeviceBase::awaitReturn(uint8_t* buf, const uint8_t* serviceId, uint8_t ser
     return false;
 }
 
-bool DeviceBase::check(const uint8_t* buf, uint8_t serviceId) {
-    return check(buf, &serviceId, 1);
+bool MessageBus::awaitReturn(uint8_t* buf, uint8_t len, uint8_t id, uint8_t serviceId, uint16_t bus, bool verify, unsigned long readOutTimeMs) {
+    return awaitReturn(buf, len, id, &serviceId, 1, bus, verify, readOutTimeMs);
 }
 
-bool DeviceBase::awaitReturn(uint8_t* buf, uint8_t serviceId) {
-    return awaitReturn(buf, &serviceId, 1);
+bool MessageBus::sendAndWait(uint8_t* buf, uint8_t len, const uint8_t* returnCount, uint16_t bus, bool addVerify, unsigned long sendCoolingMs, unsigned long maxWaitingTimeMs) {
+    const uint8_t initialCount = *returnCount;
+    const unsigned long startTime = millis();
+    while (millis() - startTime < 5000) {
+        send(buf, len, bus, addVerify, sendCoolingMs);
+        sleep(sendCoolingMs);
+        if (initialCount != *returnCount) {
+            return true;
+        }
+    }
+    return false;
 }
 
+
+DeviceBase::DeviceBase(uint8_t id) {
+    this->id = id;
+}
+
+void DeviceBase::onReceiveZigbeeMessage(uint8_t* buf) {
+}
 
 AlarmDesk::AlarmDesk(uint8_t id) : DeviceBase(id) {
+}
+
+void AlarmDesk::onReceiveZigbeeMessage(uint8_t* buf) {
+    DeviceBase::onReceiveZigbeeMessage(buf);
+    UPDATE_VALUE(buf[2] == 0x01, rescuePosition, buf[3])
 }
 
 void AlarmDesk::openByInfrared(uint8_t* openCode) {
@@ -148,29 +192,25 @@ void AlarmDesk::openByInfrared(uint8_t* openCode) {
 /***
    * 获取救援位置
    */
-uint8_t AlarmDesk::getRescuePosition() {
-    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x09, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    Command.Judgment(buf);
-    ExtSRAMInterface.ExMem_Write_Bytes(BUS_BASE_ADD, buf, 8);
 
-    if (awaitReturn(buf, 0x01)) {
-        return buf[3];
-    }
-    return 0;
+bool AlarmDesk::getRescuePosition(uint8_t* rescuePosition) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x09, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
+
+    DETECTED_VALUE_CHANGE(rescuePosition)
 }
 
 /***
- * debug
+                        * debug
  * 设置开启码
  * @param data[] len=6
  */
-void AlarmDesk::setOpenCode(uint8_t data[]) {
-
+void AlarmDesk::setOpenCode(uint8_t* data) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x10, data[5], data[4], data[3], 0x00, DATA_FRAME_TAIL};
-    send(buf);
+    messageBus.send(buf, 8);
 
     uint8_t buf2[] = {DATA_FRAME_HEADER, id, 0x11, data[2], data[1], data[0], 0x00, DATA_FRAME_TAIL};
-    send(buf2);
+    messageBus.send(buf, 8);
 }
 
 
@@ -178,92 +218,91 @@ BarrierGate::BarrierGate(uint8_t id) : DeviceBase(id) {
 }
 
 void BarrierGate::setGateControl(bool open) {
-    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x01, static_cast<uint8_t>(open ? 0x01 : 0x02), 0x00, 0x00, 0x00,
-                     DATA_FRAME_TAIL};
-    send(buf);
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x01, static_cast<uint8_t>(open ? 0x01 : 0x02), 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
+}
+
+void BarrierGate::setInitialPos(bool isUp) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x09, static_cast<uint8_t>(isUp ? 0x01 : 0x02), 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
+}
+
+void BarrierGate::setLicensePlateData(uint8_t* data) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x10, data[0], data[1], data[2], 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
+
+    uint8_t buf2[] = {DATA_FRAME_HEADER, id, 0x11, data[3], data[4], data[5], 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf2, 8);
 }
 
 bool BarrierGate::getGateControl() {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x20, 0x01, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
+    messageBus.send(buf, 8);
 
-    return awaitReturn(buf, 0x01);;
+    bool* gateControl = nullptr;
+    DETECTED_VALUE_CHANGE(gateControl)
 }
+
 
 BusStop::BusStop(uint8_t id) : DeviceBase(id) {
 }
 
+void BusStop::onReceiveZigbeeMessage(uint8_t* buf) {
+    DeviceBase::onReceiveZigbeeMessage(buf);
+    THERE_UPDATE_VALUE(buf[2] == 0x02, yy, buf[3], MM, buf[4], dd, buf[5])
+    THERE_UPDATE_VALUE(buf[2] == 0x03, HH, buf[3], mm, buf[4], ss, buf[5])
+    TWO_UPDATE_VALUE(buf[2] == 0x04, weather, (Weather) buf[3], temperature, buf[4])
+}
+
 void BusStop::broadcastSpeech(uint8_t lid) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x10, lid, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
+    messageBus.send(buf, 8);
 }
 
 void BusStop::broadcastRandomSpeech() {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x20, 0x01, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
+    messageBus.send(buf, 8);
 }
 
 void BusStop::setRtcStartDate(uint8_t yy, uint8_t MM, uint8_t dd) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x30, yy, MM, dd, 0x00, DATA_FRAME_TAIL};
-    send(buf);
+    messageBus.send(buf, 8);
 }
 
 void BusStop::setRtcStartTime(uint8_t HH, uint8_t mm, uint8_t ss) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x40, HH, mm, ss, 0x00, DATA_FRAME_TAIL};
-    send(buf);
+    messageBus.send(buf, 8);
 }
 
 bool BusStop::getRtcDate(uint8_t* yy, uint8_t* MM, uint8_t* dd) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x31, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
-    bool successful = awaitReturn(buf, 0x02);
-    if (successful) {
-        *yy = buf[3];
-        *MM = buf[4];
-        *dd = buf[5];
-    }
-    return successful;
+    messageBus.send(buf, 8);
+    THERE_DETECTED_VALUE_CHANGE(yy, MM, dd)
 }
 
 bool BusStop::getRtcTime(uint8_t* HH, uint8_t* mm, uint8_t* ss) {
-#if DE_BUG
-    Serial.println("[DEBUG] getRtcTime...");
-#endif
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x41, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
-    bool successful = awaitReturn(buf, 0x03);
-    if (successful) {
-        *HH = buf[3];
-        *mm = buf[4];
-        *ss = buf[5];
+    messageBus.send(buf, 8);
+    THERE_DETECTED_VALUE_CHANGE(HH, mm, ss)
 
-#if DE_BUG
-        Serial.print("HH:");
-        Serial.print(*HH);
-        Serial.print("  mm:");
-        Serial.print(*mm);
-        Serial.print("  ss:");
-        Serial.println(*ss);
-#endif
-
-    }
-    return successful;
 }
 
 void BusStop::setWeatherTemperature(Weather weather, uint8_t temperature) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x42, (uint8_t) weather, temperature, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
+    messageBus.send(buf, 8);
 }
 
 bool BusStop::getWeatherTemperature(Weather* weather, uint8_t* temperature) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x43, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
-    bool successful = awaitReturn(buf, 0x04);
+    messageBus.send(buf, 8);
+
+    TWO_DETECTED_VALUE_CHANGE(weather, temperature);
+    /*bool successful = awaitReturn(buf, 0x04);
     if (successful) {
         *weather = Weather(buf[3]);
         *temperature = buf[4];
     }
-    return successful;
+    return successful;*/
 }
 
 void BusStop::startSynthesizingLanguage(const uint8_t* data, uint16_t len, TextEncodingFormat textEncodingFormat) {
@@ -309,7 +348,7 @@ void Monitor::setDisplayData(uint8_t pos, const uint8_t value[]) {
     buf[3] = value[0] << 8 | value[1];
     buf[4] = value[2] << 8 | value[3];
     buf[5] = value[4] << 8 | value[4];
-    send(buf);
+    messageBus.send(buf, 8);
 
 }
 
@@ -320,42 +359,72 @@ void Monitor::setTimingMode(TimingMode timingMode) {
     Serial.println();
 #endif
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x03, (uint8_t) timingMode, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
+    messageBus.send(buf, 8);
 }
 
 void Monitor::setDistance(uint16_t distance_mm) {
-    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x04, 0x00, (uint8_t) (distance_mm >> 8), (uint8_t) distance_mm, 0x00,
-                     DATA_FRAME_TAIL};
-    send(buf);
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x04, 0x00, (uint8_t) (distance_mm >> 8), (uint8_t) distance_mm, 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
 }
 
 Carport::Carport(uint8_t id) : DeviceBase(id) {
 }
 
+void Carport::onReceiveZigbeeMessage(uint8_t* buf) {
+    DeviceBase::onReceiveZigbeeMessage(buf);
+    UPDATE_VALUE(buf[2] == 0x03 && buf[3] == 0x01, level, buf[4])
+    TWO_UPDATE_VALUE(buf[2] == 0x03 && buf[3] == 0x02, ventral, buf[4] == 0x02, rearSide, buf[5] == 0x02)
+}
+
 void Carport::moveToLevel(uint8_t level) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x01, level, 0x01, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
+    messageBus.send(buf, 8);
 }
 
 bool Carport::getLevel(uint8_t* level) {
+#if DE_BUG
+    Serial.println("getLevel...");
+#endif
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x02, 0x01, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
+    messageBus.send(buf, 8);
 
-    bool successful = awaitReturn(buf, 0x01);
+    DETECTED_VALUE_CHANGE(level)
+
+    /*uint8_t serviceId[] = {0x03, 0x01};
+    bool successful = awaitReturn(buf, serviceId, 2);
     if (successful) {
         *level = buf[4];
+#if DE_BUG
+        Serial.print("level:");
+        logHex(*level);
+        Serial.println();
+#endif
     }
-    return successful;
+    return successful;*/
 }
 
-void Carport::getInfraredState(bool* ventral, bool* rearSide) {
+bool Carport::getInfraredState(bool* ventral, bool* rearSide) {
+#if DE_BUG
+    Serial.println("getInfraredState...");
+#endif
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x02, 0x02, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
+    messageBus.send(buf, 8);
+    TWO_DETECTED_VALUE_CHANGE(ventral, rearSide)
 
-    if (awaitReturn(buf, 0x02)) {
-        *ventral = buf[4] == 0x01;
+    /*uint8_t serviceId[] = {0x03, 0x02};
+    bool s = awaitReturn(buf, serviceId, 2);
+    if (s) {
+        *ventral = buf[4] == 0x02;
         *rearSide = buf[5] == 0x02;
+#if DE_BUG
+        Serial.print("ventral:");
+        logBool(*ventral);
+        Serial.print("  rearSide:");
+        logBool(*rearSide);
+        Serial.println();
+#endif
     }
+    return s;*/
 }
 
 TrafficLight::TrafficLight(uint8_t id) : DeviceBase(id) {
@@ -363,32 +432,212 @@ TrafficLight::TrafficLight(uint8_t id) : DeviceBase(id) {
 
 void TrafficLight::requestToEnterRecognitionMode() {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x01, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
+    messageBus.send(buf, 8);
 }
 
 void TrafficLight::requestConfirmationOfIdentificationResults(TrafficLightModel trafficLightModel) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x02, (uint8_t) trafficLightModel, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
+    messageBus.send(buf, 8);
 }
 
 StreetLamp::StreetLamp(uint8_t id) : DeviceBase(id) {}
 
-K230::K230(uint8_t id) : DeviceBase(id) {
-    readBus = 0x6038;
-    readVerify = false;
-
-    receiveTrack = true;
+void StreetLamp::setLightSourceIntensity(LightSourceIntensity lightSourceIntensity) {
+    uint8_t buf[4] = {0x00, 0xFF, (uint8_t) lightSourceIntensity, (uint8_t) ~lightSourceIntensity};
+    Infrare.Transmition(buf, 4);
 }
 
-void K230::setTrackModel(bool open) {
-    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x91, 0x01, open ? (uint8_t) 0x01 : (uint8_t) 0x02, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
+WirelessCharging::WirelessCharging(uint8_t id) : DeviceBase(id) {
 
-    if (open) {
-        uint8_t trackFlagBitHigh;
-        uint8_t trackFlagBitLow;
-        getTrackFlagBit(&trackFlagBitHigh, &trackFlagBitLow);
+}
+
+void WirelessCharging::setOpenWirelessCharging(bool open) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x01, static_cast<uint8_t>(open ? 0x01 : 0x02), 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
+}
+
+void WirelessCharging::openWirelessCharging(uint8_t* openCode) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x02, openCode[2], openCode[1], openCode[0], 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
+}
+
+void WirelessCharging::setWirelessChargingOpenCode(uint8_t* openCode) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x03, openCode[2], openCode[1], openCode[0], 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
+}
+
+InformationDisplay::InformationDisplay(uint8_t id) : DeviceBase(id) {
+
+}
+
+void InformationDisplay::showSpecifiedPicture(uint8_t id) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x10, 0x00, id, 0x00, 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
+}
+
+void InformationDisplay::setThePageTurningMode(PageTurningMode pageTurningMode) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x10, static_cast<uint8_t>(pageTurningMode), 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
+}
+
+void InformationDisplay::showLicensePlate(uint8_t* licensePlate) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x20, licensePlate[5], licensePlate[4], licensePlate[3], 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
+    uint8_t buf2[] = {DATA_FRAME_HEADER, id, 0x21, licensePlate[2], licensePlate[1], licensePlate[0], 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf2, 8);
+}
+
+void InformationDisplay::setTimingMode(InformationDisplayTimingMode timingMode) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x30, static_cast<uint8_t>(timingMode), 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
+}
+
+void InformationDisplay::showData(uint8_t* data, BaseFormat baseFormat) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, static_cast<uint8_t>(baseFormat), data[2], data[1], data[0], 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
+}
+
+void InformationDisplay::showTrafficSigns(TrafficSign TrafficSign) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x60, static_cast<uint8_t>(TrafficSign), 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
+}
+
+ETC::ETC(uint8_t id) : DeviceBase(id) {
+
+}
+
+void ETC::setInitialPos(bool lUp, bool rUp) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x08, static_cast<uint8_t>(lUp ? 0x01 : 0x02), static_cast<uint8_t>(rUp ? 0x01 : 0x02), 0x00, 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
+}
+
+StereoscopicDisplay::StereoscopicDisplay(uint8_t id) : DeviceBase(id) {
+
+}
+
+void StereoscopicDisplay::showLicensePlate(uint8_t* licensePlate, uint8_t x, uint8_t y) {
+    uint8_t buf[] = {0xFF, 0x20, licensePlate[0], licensePlate[1], licensePlate[2], licensePlate[3]};
+    Infrare.Transmition(buf, 6);
+    uint8_t buf2[] = {0xFF, 0x10, licensePlate[4], licensePlate[5], x, y};
+    Infrare.Transmition(buf2, 6);
+}
+
+void StereoscopicDisplay::showDistance(uint8_t value) {
+    uint8_t buf[] = {0xFF, 0x11, static_cast<uint8_t>((value / 10) % 10), static_cast<uint8_t>(value % 10), 0x00, 0x00};
+    Infrare.Transmition(buf, 6);
+}
+
+void StereoscopicDisplay::showGraphText(Graph graph) {
+    uint8_t buf[] = {0xFF, 0x12, static_cast<uint8_t>(graph), 0x00, 0x00, 0x00};
+    Infrare.Transmition(buf, 6);
+}
+
+void StereoscopicDisplay::showColorText(StereoscopicDisplayColor stereoscopicDisplayColor) {
+    uint8_t buf[] = {0xFF, 0x13, static_cast<uint8_t>(stereoscopicDisplayColor), 0x00, 0x00, 0x00};
+    Infrare.Transmition(buf, 6);
+}
+
+void StereoscopicDisplay::showTrafficWarningSigns(TrafficWarningSigns trafficWarningSigns) {
+    uint8_t buf[] = {0xFF, 0x14, static_cast<uint8_t>(trafficWarningSigns), 0x00, 0x00, 0x00};
+    Infrare.Transmition(buf, 6);
+}
+
+void StereoscopicDisplay::showTrafficSign(TrafficSign trafficSign) {
+    uint8_t buf[] = {0xFF, 0x15, static_cast<uint8_t>(trafficSign), 0x00, 0x00, 0x00};
+    Infrare.Transmition(buf, 6);
+}
+
+void StereoscopicDisplay::showDefaultInformation() {
+    uint8_t buf[] = {0xFF, 0x16, 0x01, 0x00, 0x00, 0x00};
+    Infrare.Transmition(buf, 6);
+}
+
+void StereoscopicDisplay::setTextColor(uint8_t r, uint8_t g, uint8_t b) {
+    uint8_t buf[] = {0xFF, 0x17, 0x01, r, g, b};
+    Infrare.Transmition(buf, 6);
+}
+
+void StereoscopicDisplay::showText(const uint16_t* gbk, uint8_t len) {
+    uint8_t buf[] = {0xFF, 0x31, 0x00, 0x00, 0x00, 0x00};
+    for (int i = 0; i < len; ++i) {
+        buf[3] = gbk[i] >> 8;
+        buf[2] = gbk[i];
+        if (i == len - 1) {
+            buf[4] = 0x55;
+        }
+        Infrare.Transmition(buf, 6);
     }
+}
+
+void StereoscopicDisplay::showTextByZigBee(const uint16_t* gbk, uint8_t len) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x31, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+    for (int i = 0; i < len; ++i) {
+        buf[3] = gbk[i] >> 8;
+        buf[4] = gbk[i];
+        if (i == len - 1) {
+            buf[5] = 0x55;
+        }
+        messageBus.send(buf, 8);
+    }
+}
+
+double UltrasonicDevice::ranging(int sys, int rangeFrequency, int wait) {
+    double distance = 0;
+    for (int i = 0; i < rangeFrequency; ++i) {
+        distance += Ultrasonic.Ranging(CM);
+        sleep(wait);
+    }
+    return distance / rangeFrequency;
+}
+
+void UltrasonicDevice::adjustDistance(uint8_t carSeep, uint8_t targetDistance, double errorMargin, unsigned long controlTime_ms, int wait) {
+    ulong startTime = millis();
+    while (millis() - startTime >= controlTime_ms) {
+        DCMotor.Stop();
+        double distance = Ultrasonic.Ranging(CM);;
+        double distanceError = distance - targetDistance;
+        if (abs(distanceError) > errorMargin) {
+            if (distanceError > errorMargin) {
+                DCMotor.Go(carSeep);
+            } else {
+                DCMotor.Back(carSeep);
+            }
+        }
+        sleep(wait);
+    }
+    DCMotor.Stop();
+}
+
+K230::K230(uint8_t id) : DeviceBase(id) {
+}
+
+void K230::setTrackModel(uint8_t model) {
+
+#if DE_BUG
+    Serial.print("[DEBUG] setCameraSteeringGearAngle:");
+    logBin(model);
+    Serial.println();
+#endif
+    this->trackModel = model;
+
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x91, 0x01, model, 0x00, 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
+
+    if (model) {
+        getTrackFlagBit(nullptr);
+    }
+}
+
+void K230::setTrackModel(const TrackModel* trackModel, uint8_t len) {
+    uint8_t model = 0;
+    for (int i = 0; i < len; ++i) {
+        model |= trackModel[i];
+    }
+    setTrackModel(model);
+}
+
+uint8_t K230::getTrackModelCache() {
+    return trackModel;
 }
 
 int8_t K230::getCameraSteeringGearAngleCache() {
@@ -396,48 +645,40 @@ int8_t K230::getCameraSteeringGearAngleCache() {
 }
 
 void K230::setCameraSteeringGearAngle(int8_t angle) {
+
+#if DE_BUG
+    Serial.print("[DEBUG] setCameraSteeringGearAngle:");
+    Serial.print(angle);
+    Serial.println();
+#endif
     cameraSteeringGearAngle = angle;
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x91, 0x02, (uint8_t) angle, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
+    messageBus.send(buf, 8);
+
     //Command.Judgment(buf);
     //ExtSRAMInterface.ExMem_Write_Bytes(BUS_BASE_ADD, buf, 8);
-    //Serial.send(buf, 8);
+    //Serial.messageBus.send(buf, 8);
 }
 
-
-bool K230::getTrackFlagBit(uint8_t* trackFlagBitHigh, uint8_t* trackFlagBitLow) {
-    uint8_t buf[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+bool K230::getTrackFlagBit(uint8_t* result) {
+    uint8_t buf[12] = {};
     uint8_t sbuf[2] = {0x091, 0x01};
-    bool successful = awaitReturn(buf, sbuf, 2);
+    bool successful = messageBus.awaitReturn(buf, 12, id, sbuf, 2, 0x6038);
+
     if (successful) {
-        *trackFlagBitHigh = buf[4];
-        *trackFlagBitLow = buf[5];
+        if (result != nullptr) {
+            for (int i = 0; i < 6; ++i) {
+                result[i] = buf[4 + i];
+            }
+        }
 #if DE_BUG
         Serial.print("[DEBUG] trackFlagBit:");
-        logHex(buf[4]);
-        logHex(buf[5]);
+        logHex(buf + 4, 6);
         Serial.println();
 #endif
     }
     return successful;
 }
-
-
-/***
- * 16版本
- * @param flagBitHigh
- * @return
- */
-bool K230::getTrackFlagBit(uint16_t* flagBitHigh) {
-    uint8_t trackFlagBitHigh;
-    uint8_t trackFlagBitLow;
-    bool successful = getTrackFlagBit(&trackFlagBitHigh, &trackFlagBitLow);
-    if (successful) {
-        *flagBitHigh = trackFlagBitHigh << 8 | trackFlagBitLow;
-    }
-    return successful;
-}
-
 
 bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen) {
 #if DE_BUG
@@ -451,10 +692,10 @@ bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen
     }
 
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x92, 0x01, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
+    messageBus.send(buf, 8);
 
     uint8_t serviceIds[] = {0x92, 0x01, 0x01};
-    if (!awaitReturn(buf, serviceIds, 3)) {
+    if (!messageBus.awaitReturn(buf, 8, id, serviceIds, 3, 0x6038)) {
         *count = 0;
         return false;
     }
@@ -481,25 +722,24 @@ bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen
     }
 
     uint8_t hitCount = 0;
-    uint8_t bufLong[32] = {};
     unsigned long startTime = millis();
-    while (millis() - startTime < readOutTime_ms) {
-        if (ExtSRAMInterface.ExMem_Read(readBus) == 0x00) {
+    while (millis() - startTime < 1000) {
+        if (ExtSRAMInterface.ExMem_Read(0x6038) == 0x00) {
             continue;
         }
-        ExtSRAMInterface.ExMem_Read_Bytes(readBus, bufLong, 32);
+        ExtSRAMInterface.ExMem_Read_Bytes(0x6038, qrRecognizeBuf, 32);
 #if DE_BUG
         Serial.print("read:");
-        logHex(bufLong, 32);
+        logHex(qrRecognizeBuf, 32);
         Serial.println();
 #endif
 
         if (
-                bufLong[0] != DATA_FRAME_HEADER
-                || bufLong[1] != id
-                || bufLong[2] != 0x92
-                || bufLong[3] != 0x01
-                || bufLong[4] != 0x02
+                qrRecognizeBuf[0] != DATA_FRAME_HEADER
+                || qrRecognizeBuf[1] != id
+                || qrRecognizeBuf[2] != 0x92
+                || qrRecognizeBuf[3] != 0x01
+                || qrRecognizeBuf[4] != 0x02
                 ) {
 #if DE_BUG
             Serial.println("verification failure");
@@ -507,7 +747,7 @@ bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen
             continue;
         }
 
-        uint8_t qrId = bufLong[5];
+        uint8_t qrId = qrRecognizeBuf[5];
 
 #if DE_BUG
         Serial.print("receive qr id:");
@@ -525,15 +765,15 @@ bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen
         QrMessage* qrMessage = qrMessageArray + qrId;
 
         qrMessage->efficient = true;
-        qrMessage->qrColor = K210Color(bufLong[6]);
+        qrMessage->qrColor = K210Color(qrRecognizeBuf[6]);
 
 #if DE_BUG
         Serial.print("receive qr color:");
-        logHex(K210Color(bufLong[6]));
+        logObj(K210Color(qrRecognizeBuf[6]));
         Serial.println();
 #endif
 
-        uint8_t messageLen = bufLong[7];
+        uint8_t messageLen = qrRecognizeBuf[7];
         messageLen = messageLen > qrMessage->messageMaxLen
                      ? qrMessage->messageMaxLen
                      : messageLen < 0
@@ -549,12 +789,12 @@ bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen
 #endif
 
         for (int i = 0; i < messageLen; ++i) {
-            qrMessage->message[i] = bufLong[8 + i];
+            qrMessage->message[i] = qrRecognizeBuf[8 + i];
         }
 
 #if DE_BUG
         Serial.print("message:");
-        Serial.write(bufLong + 8, messageLen);
+        Serial.write(qrRecognizeBuf + 8, messageLen);
         Serial.println();
 #endif
 
@@ -576,10 +816,10 @@ bool K230::trafficLightRecognize(K210Color* k210Color) {
 #endif
 
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x92, 0x03, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
+    messageBus.send(buf, 8);
 
     uint8_t serviceIds[] = {0x92, 0x03};
-    bool successful = awaitReturn(buf, serviceIds, 2);
+    bool successful = messageBus.awaitReturn(buf, 8, id, serviceIds, 2, 0x6038);
 
     if (successful) {
         *k210Color = K210Color(buf[4]);
@@ -668,85 +908,290 @@ bool K230::trafficLightRecognize_rigorous(K210Color* k210Color, uint16_t consecu
 bool K230::ping() {
     receiveTrack = true;
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x92, 0xFE, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    send(buf);
+    messageBus.send(buf, 8);
     uint8_t serviceIds[] = {0x92, 0xFE};
-    bool successful = awaitReturn(buf, serviceIds, 2);
+    bool successful = messageBus.awaitReturn(buf, 8, id, serviceIds, 2, 0x6038);
     receiveTrack = false;
     return successful;
 }
 
-/*void K230::loop() {
-    if (!receiveTrack) {
-        return;
-    }
+MainCar::MainCar(uint8_t id) : DeviceBase(id) {
+}
 
-    uint8_t buf[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+void MainCar::onReceiveZigbeeMessage(uint8_t* buf) {
+    DeviceBase::onReceiveZigbeeMessage(buf);
+}
 
-    if (ExtSRAMInterface.ExMem_Read(readBus) == 0x00) {
-        return;
-    }
-
-    ExtSRAMInterface.ExMem_Read_Bytes(readBus, buf, 8);
-
+void Car::onReceiveZigbeeMessage(uint8_t* buf) {
+    DeviceBase::onReceiveZigbeeMessage(buf);
 #if DE_BUG
-    Serial.print("[DEBUG] k230 loop read:");
-    logHex(buf, 8);
+    Serial.println("[DEBUG] onReceiveZigbeeMessage from car:");
 #endif
-    uint8_t sbuf[] = {0x091, 0x01};
-    if (!check(buf, sbuf, 2)) {
-        return;
+
+    uint8_t _buf[] = {DATA_FRAME_HEADER, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
+
+    uint8_t name = 0;
+
+    switch (buf[2]) {
+        case 0x01: //同步全局变量
+            name = buf[3];
+            netSynchronization.globalVariable[name] = buf[4] << 8 | buf[5];
+            netSynchronization.globalVariableVersion[name]++;
+#if DE_BUG
+            Serial.print("[DEBUG] synchronousGlobalVariable...");
+            Serial.print("  name:");
+            logHex(name);
+            Serial.print("  value:");
+            Serial.print(netSynchronization.globalVariable[buf[3]]);
+            Serial.print("  value(HEX):");
+            logHex(buf + 4, 2);
+            Serial.println();
+#endif
+            _buf[2] = ~0x01;
+            _buf[3] = buf[3];
+            _buf[4] = buf[4];
+            _buf[5] = buf[5];
+            messageBus.send(_buf, 8);
+            break;
+        case 0xFE: //~0x01
+            netSynchronization.globalVariableReturnCount++;
+#if DE_BUG
+            Serial.print("[DEBUG] globalVariableReturnCount:");
+            Serial.print(netSynchronization.globalVariableReturnCount);
+            Serial.println();
+#endif
+            break;
+#if FOR_THE_KING_HEN
+        case 0x21:
+#if DE_BUG
+            Serial.print("[DEBUG] synchronousLicensePlateNumber high...");
+            Serial.print("  data:");
+            logHex(buf + 3, 3);
+            Serial.println();
+#endif
+            _buf[2] = ~0x21;
+            _buf[3] = buf[3];
+            _buf[4] = buf[4];
+            _buf[5] = buf[5];
+            messageBus.send(_buf, 8);
+            break;
+        case 0xDE://~0x21
+            netSynchronization.licensePlateNumberHighReturnCount++;
+#if DE_BUG
+            Serial.print("[DEBUG] licensePlateNumberHighReturnCount:");
+            Serial.print(netSynchronization.licensePlateNumberHighReturnCount);
+            Serial.println();
+#endif
+            break;
+        case 0x22:
+#if DE_BUG
+            Serial.print("[DEBUG] synchronousLicensePlateNumber low...");
+            Serial.print("  data:");
+            logHex(buf + 3, 3);
+            Serial.println();
+#endif
+            _buf[2] = ~0x22;
+            _buf[3] = buf[3];
+            _buf[4] = buf[4];
+            _buf[5] = buf[5];
+            messageBus.send(_buf, 8);
+            break;
+        case 0xDD://~0x22
+            netSynchronization.licensePlateNumberLowReturnCount++;
+#if DE_BUG
+            Serial.print("[DEBUG] licensePlateNumberLowReturnCount:");
+            Serial.print(netSynchronization.licensePlateNumberLowReturnCount);
+            Serial.println();
+            break;
+#endif
     }
+#endif
+}
+
+
+bool NetSynchronization::synchronousGlobalVariable(uint8_t name, uint16_t value) {
+    globalVariable[name] = value;
+    globalVariableVersion[name]++;
+
+    //char aabb[256] = {};
+    //aabb[255] = 'a';
+    //Serial.print(aabb);
 
 #if DE_BUG
-    Serial.print("[DEBUG] trackFlagBit:");
-    logHex(buf[4]);
+    Serial.print("[DEBUG] synchronousGlobalVariable...");
+    Serial.print("  name:");
+
+    //char str[5];
+    //sprintf(str, "%d", name);
+    //Serial.print(str);
+
+    Serial.print("  value:");
+    //Serial.print(value);
+    Serial.print("  value(HEX):");
+    uint8_t bufLog[] = {(uint8_t) (value >> 8), (uint8_t) value};
+    logHex(bufLog, 2);
     Serial.println();
 #endif
 
-    trackFlagBit = buf[4];
+    uint8_t buf[] = {DATA_FRAME_HEADER, 0x01, 0x01, name, (uint8_t) (value >> 8), (uint8_t) (value), 0x00, DATA_FRAME_TAIL};
+
+    bool s = messageBus.sendAndWait(buf, 8, &globalVariableReturnCount);
+
+#if DE_BUG
+    Serial.print("[DEBUG] synchronousGlobalVariable");
+    Serial.print(s ? "successful" : "outTime");
+    Serial.print("...");
+    Serial.println();
+#endif
+    return s;
+}
+
+bool NetSynchronization::synchronousGlobalVariable(uint8_t name, uint16_t* value, uint8_t len) {
+
+#if DE_BUG
+    Serial.print("[DEBUG] synchronousGlobalVariables...");
+    Serial.print("  originAddress:");
+    Serial.print(name);
+    Serial.print("  value:");
+    logHex(value, len);
+    Serial.println();
+#endif
+
+    for (int i = 0; i < len; ++i) {
+        if (!synchronousGlobalVariable(name + i, value[i])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool NetSynchronization::synchronousGlobalVariable(uint8_t name, uint8_t* value, uint8_t len) {
+
+#if DE_BUG
+    Serial.print("[DEBUG] synchronousGlobalVariables(8bit)...");
+    Serial.print("  originAddress:");
+    Serial.print(name);
+    Serial.print("  value:");
+    logHex(value, len);
+    Serial.println();
+#endif
+
+    for (int i = 0; i < len; ++i) {
+        if (!synchronousGlobalVariable(name + i, value[i])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+uint16_t NetSynchronization::getGlobalVariable(uint8_t name) {
+    return globalVariable[name];
+}
+
+void NetSynchronization::getGlobalVariable(uint8_t name, uint16_t* buf, uint8_t len) {
+    for (int i = 0; i < len; ++i) {
+        buf[i] = globalVariable[name + i];
+    }
+}
+
+void NetSynchronization::getGlobalVariable(uint8_t name, uint8_t* buf, uint8_t len) {
+    for (int i = 0; i < len; ++i) {
+        buf[i] = globalVariable[name + i];
+    }
+}
+
+bool NetSynchronization::synchronousLicensePlateNumber(uint8_t* data) {
+#if DE_BUG
+    Serial.print("[DEBUG] synchronousLicensePlateNumber...");
+    Serial.print("  data:");
+    logHex(data, 6);
+    Serial.println();
+#endif
+
+    bool s;
+#if FOR_THE_KING_HEN
+    uint8_t buf[] = {DATA_FRAME_HEADER, 0x01, 0x21, data[0], data[1], data[2], 0x00, DATA_FRAME_TAIL};
+    s = messageBus.sendAndWait(buf, 8, &licensePlateNumberHighReturnCount);
+    if (!s) {
+        return false;
+    }
+    uint8_t buf2[] = {DATA_FRAME_HEADER, 0x01, 0x22, data[3], data[4], data[5], 0x00, DATA_FRAME_TAIL};
+    s = messageBus.sendAndWait(buf2, 8, &licensePlateNumberLowReturnCount);
+    if (!s) {
+        return false;
+    }
+#endif
+
+    s = synchronousGlobalVariable(174, data, 6);
+    if (!s) {
+        return false;
+    }
+    s = synchronousGlobalVariable(173, 0xFFFF);
+    return s;
+}
+
+bool NetSynchronization::getLicensePlateNumber(uint8_t* buf) {
+    if (!getGlobalVariable(173)) {
+        return false;
+    }
+    getGlobalVariable(174, buf, 6);
+    return true;
+}
+
+bool NetSynchronization::synchronousPathInformation(uint16_t* buf, uint8_t len) {
+#if DE_BUG
+    Serial.print("[DEBUG] synchronousPathInformation...");
+    Serial.print("  data:");
+    logHex(buf, len);
+    Serial.println();
+#endif
+    bool s = synchronousGlobalVariable(181, buf, clamp(len, 0, 32));
+    if (!s) {
+        return false;
+    }
+    s = synchronousGlobalVariable(180, 0xFFFF);
+    return s;
+}
+
+bool NetSynchronization::getPathInformation(uint16_t* buf, uint8_t maxLen, uint8_t* len) {
+    if (!getGlobalVariable(180)) {
+        return false;
+    }
+    uint8_t _len = clamp(maxLen, 0, 32);
+    getGlobalVariable(181, buf, _len);
+    for (int i = 0; i < _len; ++i) {
+        if (buf[i] == 0) {
+            *len = i;
+            break;
+        }
+    }
+    return true;
+}
+
+uint16_t NetSynchronization::getMainCarPos() {
+    return getGlobalVariable(213);
+}
+
+uint16_t NetSynchronization::getEntourageCarPos() {
+    return getGlobalVariable(214);
+}
+
+bool NetSynchronization::synchronousEntourageCarPos(uint16_t pos) {
+    return synchronousGlobalVariable(214, pos);
+}
 
 
-}*/
+Car::Car(uint8_t id) : DeviceBase(id) {
+}
 
-/***
- * 到弯停车状态
- */
-/*
-static const uint8_t TO_BEND_PARKING_CONDITIONS[] = {
-        0b11110000, // 0xf0
-        0b11100001, // 0xE1
-        0b11000011, // 0xC3
-        0b10000111, // 0x87
-        0b00001111, // 0x0F
-        0b10000001, // 0x81
-        0b11000000, // 0xC0
-        0b00000011, // 0x03
-        0b00011111, // 0x1F
-        0b11110001, // 0xF1
-        0b11111000, // 0xF8
-        0b11111100, // 0xFC
-        0b00111111, // 0x3F
-        0b00000001, // 0x01
-        0b10000000, // 0x80
-        0b11000001, // 0xC1
-        0b10000011, // 0x83
-        0b11100000, // 0xE0
-        0b00000111,  // 0x07
-};
-*/
+void Car::carSleep(uint16_t time) {
+    unsigned long startTime = millis();
 
-Car::Car() {
-    straightLineSpeed = 20;
-    turnLeftSpeed = 40;
-    turnRightSpeed = 40;
-
-    straightLineKpSpeed = 40;
-    trimKpSpeed = 30;
-
-    outTime_ms = 10000;
-    trimOutTime_ms = 1000;
-
-    trackResult = {};
+    while (millis() - startTime < time) {
+        acceptTrackFlag();
+    }
 }
 
 void Car::clearCodeDisc() {
@@ -762,16 +1207,16 @@ void Car::clearCodeDisc() {
 
     ExtSRAMInterface.ExMem_Write_Bytes(0x6008, buf, 8);
 #if DE_BUG
-    Serial.println("clearCodeDisc");
+    Serial.println("[DEBUG] clearCodeDisc.");
 #endif
 }
 
 uint16_t Car::getCodeDisc() {
     uint16_t code = ExtSRAMInterface.ExMem_Read(0x6003) << 8 | ExtSRAMInterface.ExMem_Read(0x6002);
 #if DE_BUG
-    Serial.print("getCodeDisc:");
+    /*Serial.print("[DEBUG] getCodeDisc:");
     Serial.print(code);
-    Serial.println();
+    Serial.println();*/
 #endif
     return code;
 }
@@ -779,47 +1224,73 @@ uint16_t Car::getCodeDisc() {
 uint16_t Car::getTrackLamp() {
     uint16_t code = ExtSRAMInterface.ExMem_Read(0x6001) << 8 | ExtSRAMInterface.ExMem_Read(0x6000);
 #if DE_BUG
-    Serial.print("getTrackLamp:");
+    Serial.print("[DEBUG] getTrackLamp:");
     Serial.print(code);
     Serial.println();
 #endif
     return code;
 }
 
-void Car::turnLeft(bool trimCar) {
+
+void Car::turnLeft(uint8_t angle) {
+#if DE_BUG
+    Serial.println("[DEBUG] in turnLeft...");
+#endif
     DCMotor.SpeedCtr(-40, 40);
-    sleep(1500);
+    sleep(16 * angle);
     DCMotor.Stop();
-    if (trimCar) {
-        this->trimCar();
-    }
+#if DE_BUG
+    Serial.println("[DEBUG] end turnLeft...");
+#endif
 }
 
-void Car::turnRight(bool trimCar) {
+void Car::turnRight(uint8_t angle) {
+#if DE_BUG
+    Serial.println("[DEBUG] in turnRight...");
+#endif
     DCMotor.SpeedCtr(40, -40);
-    sleep(1500);
+    sleep(16 * angle);
     DCMotor.Stop();
-    if (trimCar) {
-        this->trimCar();
-    }
+#if DE_BUG
+    Serial.println("[DEBUG] end turnRight...");
+#endif
 }
 
-void Car::trackTurnLeft(bool trimCar) {
-    DCMotor.SpeedCtr(-turnLeftSpeed, turnLeftSpeed);
+void Car::trackTurnLeft() {
+
+#if DE_BUG
+    Serial.println("[DEBUG] in trackTurnLeft...");
+#endif
+    int8_t angle = k230.getCameraSteeringGearAngleCache();
+    k230.setCameraSteeringGearAngle(-80);
+
+    DCMotor.SpeedCtr(-turningSpeed, turningSpeed);
     rotationProcess();
     DCMotor.Stop();
-    if (trimCar) {
-        this->trimCar();
-    }
+
+    k230.setCameraSteeringGearAngle(angle);
+
+#if DE_BUG
+    Serial.println("[DEBUG] end trackTurnLeft...");
+#endif
 }
 
-void Car::trackTurnRight(bool trimCar) {
-    DCMotor.SpeedCtr(turnRightSpeed, -turnRightSpeed);
+void Car::trackTurnRight() {
+
+#if DE_BUG
+    Serial.println("[DEBUG] in trackTurnRight...");
+#endif
+    int8_t angle = k230.getCameraSteeringGearAngleCache();
+    k230.setCameraSteeringGearAngle(-80);
+
+    DCMotor.SpeedCtr(turningSpeed, -turningSpeed);
     rotationProcess();
     DCMotor.Stop();
-    if (trimCar) {
-        this->trimCar();
-    }
+
+    k230.setCameraSteeringGearAngle(angle);
+#if DE_BUG
+    Serial.println("[DEBUG] end trackTurnRight...");
+#endif
 }
 
 void Car::rotationProcess() {
@@ -827,15 +1298,15 @@ void Car::rotationProcess() {
 
     unsigned long startTime = millis();
 
-    while (millis() - startTime < outTime_ms) {
+    while (millis() - startTime < outTimeMs) {
         acceptTrackFlag();
-        if (!trackResult.bitCount) {
+        if (!trackRowResult.bitCount) {
             break;
         }
     }
-    while (millis() - startTime < outTime_ms) {
+    while (millis() - startTime < outTimeMs) {
         acceptTrackFlag();
-        if (trackResult.centerBitCount >= 3) {
+        if (trackRowResult.centerBitCount >= 3) {
             break;
         }
     }
@@ -843,78 +1314,46 @@ void Car::rotationProcess() {
     DCMotor.Stop();
 }
 
-void Car::waitCodeDisc(uint16_t distance) {
+void Car::waitCodeDisc(int16_t distance) {
     uint16_t old = getCodeDisc();
-    uint16_t add = 0;
     while (true) {
-        uint16_t newCode = getCodeDisc();
-
-        // 计算变化量的绝对值，处理溢出和方向
-        uint16_t rawChange = newCode - old;
-        auto signedChange = static_cast<int16_t>(rawChange);
-        uint16_t change = abs(signedChange);
-
-        add += change;
-
-        if (add >= distance) {
-            return;
+        uint16_t current = getCodeDisc();
+        auto delta = static_cast<int16_t>(current - old);
+        if ((distance > 0 && delta >= distance) || (distance < 0 && delta <= distance)) {
+            break;
         }
-        old = newCode; // 更新旧值，准备下一次循环
+        yield();
     }
 }
 
-void Car::trackAdvance() {
+void Car::trackAdvanceToNextJunction() {
     unsigned long startTime = millis();
 
-    DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
+    DCMotor.SpeedCtr(straightSpeed, straightSpeed);
 
-    while (millis() - startTime < outTime_ms) {
+    while (millis() - startTime < outTimeMs) {
         acceptTrackFlag();
 
-        if (trackResult.flagBit == 0) {
-            DCMotor.SpeedCtr(straightLineSpeed, straightLineSpeed);
-            waitCodeDisc(80);
-            if (trackResult.edgeBitCount >= 6) {
+        if ((trackRowResult.edgeBitCount >= 6 || trackRowResult.bitCount >= 12)) {
 
-                while (millis() - startTime < outTime_ms) {
-                    acceptTrackFlag();
+#if DE_BUG
+            Serial.println("[DEBUG] meet a junction...");
+#endif
 
-                    //离开特殊地形
-                    if (trackResult.flagBit == 0) {
-                        DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
-                        waitCodeDisc(100);
-                        acceptTrackFlag();
-                        break;
-                    }
-
-                    trackResult.flagBit = ~trackResult.flagBit;
-
-                    centralPoint((uint8_t*) &trackResult.flagBit, 2, nullptr, &trackResult.offset);
-
-                    DCMotor.SpeedCtr(
-                            straightLineSpeed,
-                            straightLineSpeed
-                    );
-
-                }
-
-            }
-        }
-
-        if ((trackResult.edgeBitCount >= 6 || trackResult.bitCount >= 12)) {
-            DCMotor.SpeedCtr((int16_t) straightLineSpeed, (int16_t) straightLineSpeed);
-            waitCodeDisc(350);
+            // -80 m : 350
+            advance(580);
             trimCar();
             break;
+
         }
 
-        if (inRand(trackResult.offset, -0.3, 0.3)) {
+        if (inRand(trackRowResult.offset, -0.2, 0.2)) {
 
-            int16_t lSpeed = straightLineSpeed;
-            int16_t rSpeed = straightLineSpeed;
+            int16_t lSpeed = straightSpeed;
+            int16_t rSpeed = straightSpeed;
 
-            lSpeed += ((int16_t) (trackResult.offset * straightLineKpSpeed));
-            rSpeed -= ((int16_t) (trackResult.offset * straightLineKpSpeed));
+            lSpeed += ((int16_t) (trackRowResult.offset * straightLineKpSpeed));
+            rSpeed -= ((int16_t) (trackRowResult.offset * straightLineKpSpeed));
 
             DCMotor.SpeedCtr(
                     lSpeed,
@@ -926,50 +1365,244 @@ void Car::trackAdvance() {
 
     }
     DCMotor.Stop();
+
+}
+
+void Car::overspecificRelief() {
+    unsigned long startTime = millis();
+
+    while (millis() - startTime < outTimeMs) {
+        acceptTrackFlag();
+        if (trackRowResult.flagBit == 0) {
+            break;
+        }
+        advance(30);
+        trimCar();
+        sleep(100);
+    }
+
+    while (millis() - startTime < outTimeMs) {
+        acceptTrackFlag();
+
+        uint8_t lc = countBits(trackRowResult.flagBitArray, 2, 0, 4);
+        uint8_t rc = countBits(trackRowResult.flagBitArray, 2, 12, 16);
+
+        if (lc == 0 && rc == 0) {
+            advance(10);
+            sleep(50);
+            continue;
+        }
+
+        if (lc == 4 && rc == 4) {
+            break;
+        }
+
+        DCMotor.SpeedCtr(
+                lc > rc
+                ? -turningSpeed
+                : turningSpeed,
+                lc > rc
+                ? turningSpeed
+                : -turningSpeed
+        );
+
+        sleep(50);
+        DCMotor.Stop();
+
+        carSleep(100);
+    }
+
+
+    while (millis() - startTime < outTimeMs) {
+
+        DCMotor.SpeedCtr(straightSpeed, straightSpeed);
+
+        acceptTrackFlag();
+
+        if (trackRowResult.flagBit == 0) {
+
+            advance(100);
+
+            acceptTrackFlag();
+
+            if (trackRowResult.edgeBitCount <= 3) {
+                break;
+            }
+
+        }
+
+        trackRowResult.centerBitCount = ~trackRowResult.centerBitCount;
+        uint8_t buf[2] = {};
+        lonelinessExclusion(flagBitArray, 2, buf);
+        centralPoint(buf, 2, nullptr, &trackRowResult.offset);
+
+        if (inRand(trackRowResult.offset, -0.2, 0.2)) {
+
+            int16_t lSpeed = straightSpeed;
+            int16_t rSpeed = straightSpeed;
+
+            lSpeed += ((int16_t) (trackRowResult.offset * straightLineKpSpeed));
+            rSpeed -= ((int16_t) (trackRowResult.offset * straightLineKpSpeed));
+
+            DCMotor.SpeedCtr(
+                    lSpeed,
+                    rSpeed
+            );
+
+
+        } else {
+            trimCar();
+        }
+
+    }
+
+    DCMotor.Stop();
+}
+
+void Car::advanceToNextJunction() {
+    unsigned long startTime = millis();
+
+    DCMotor.SpeedCtr(straightSpeed, straightSpeed);
+    while (millis() - startTime < outTimeMs) {
+        acceptTrackFlag();
+        if ((trackRowResult.edgeBitCount >= 6 || trackRowResult.bitCount >= 12)) {
+            DCMotor.Stop();
+            break;
+        }
+    }
+
+}
+
+void Car::recoilToNextJunction() {
+    unsigned long startTime = millis();
+
+    DCMotor.SpeedCtr(-straightSpeed, -straightSpeed);
+
+    while (millis() - startTime < outTimeMs) {
+        acceptTrackFlag();
+
+        if ((trackRowResult.edgeBitCount >= 6 || trackRowResult.bitCount >= 12)) {
+            DCMotor.Stop();
+            break;
+        }
+
+    }
 }
 
 void Car::advance(uint16_t distance) {
     DCMotor.SpeedCtr(
-            straightLineSpeed,
-            straightLineSpeed
+            straightSpeed,
+            straightSpeed
     );
-    waitCodeDisc(distance);
+    waitCodeDisc((int16_t) distance);
     DCMotor.Stop();
 }
 
 void Car::recoil(uint16_t distance) {
     DCMotor.SpeedCtr(
-            -straightLineSpeed,
-            -straightLineSpeed
+            -straightSpeed,
+            -straightSpeed
     );
-    waitCodeDisc(distance);
+    waitCodeDisc(-(int16_t) distance);
     DCMotor.Stop();
 }
 
-void Car::trimCar() {
 
+void Car::mobileCorrection(uint16_t step) {
+    unsigned long startTime = millis();
+    uint8_t positiveAttitude = 0;
+    bool advanceTag = true;
+    while (millis() - startTime < outTimeMs) {
+        if (advanceTag) {
+            advance(step);
+        } else {
+            recoil(step);
+        }
+        advanceTag = !advanceTag;
+
+        carSleep(100);
+        acceptTrackFlag();
+        bool inRand = inRand(trackRowResult.offset, -0.08, 0.08);
+        trimCar();
+        if (inRand) {
+            positiveAttitude++;
+            if (positiveAttitude >= 3) {
+                break;
+            }
+            continue;
+        }
+
+        positiveAttitude = 0;
+
+    }
+}
+
+void Car::advanceCorrection(uint16_t step, uint8_t maximumFrequency) {
+    unsigned long startTime = millis();
+    uint8_t positiveAttitude = 0;
+    uint8_t advanceTag = 0;
+    while (millis() - startTime < outTimeMs) {
+
+        carSleep(50);
+        acceptTrackFlag();
+        bool inRand = inRand(trackRowResult.offset, -0.08, 0.08);
+        trimCar();
+        if (inRand) {
+            positiveAttitude++;
+            if (positiveAttitude >= 3) {
+                break;
+            } else {
+                positiveAttitude = 0;
+            }
+        }
+
+        advanceTag++;
+        if (advanceTag <= maximumFrequency) {
+            advance(step);
+        } else {
+            break;
+        }
+
+    }
+}
+
+void Car::trimCar() {
+    trimCar(&trackRowResult, 0);
+}
+
+void Car::trimCar(TrackRowResult* trackRowResult, float offset) {
 #if DE_BUG
     Serial.println("[DEBUG] in trimCar...");
 #endif
 
     unsigned long startTime = millis();
-
-    while (millis() - startTime < trimOutTime_ms) {
+    while (millis() - startTime < trimOutTimeMs) {
         acceptTrackFlag();
-        if (trackResult.offset == 0) {
+
+        float trimOffset = trackRowResult->offset + offset;
+        if (trimOffset == 0) {
             break;
         }
+
+        auto time = (int16_t) (430.0f * trimOffset);
+        time = time < 0 ? -time : time;
+        time = time > 100 ? 100 : time;
+
 #if DE_BUG
         Serial.print("[DEBUG] offset:");
-        Serial.print(trackResult.offset);
+        Serial.print(trackRowResult->offset);
+        Serial.print("  sleep:");
+        Serial.print(time);
         Serial.println();
 #endif
 
-        DCMotor.SpeedCtr(
-                ((int16_t) (trackResult.offset * trimKpSpeed)),
-                -((int16_t) (trackResult.offset * trimKpSpeed))
-        );
 
+        DCMotor.SpeedCtr(
+                ((int16_t) (tristate(trimOffset, -20, 0, 20))),
+                ((int16_t) (tristate(trimOffset, 20, 0, -20)))
+        );
+        sleep(time);
+        DCMotor.Stop();
     }
 
     DCMotor.Stop();
@@ -979,6 +1612,42 @@ void Car::trimCar() {
 #endif
 }
 
+
+/***
+ * 矫正车身，与寻迹线平行（增强版）
+ * 策略：当高低寻迹线偏移量相等且趋近零时，认为车身已平行
+ */
+void Car::rightCar() {
+    uint8_t trackModel = k230.getTrackModelCache();
+    int8_t angle = k230.getCameraSteeringGearAngleCache();
+
+    k230.setCameraSteeringGearAngle(-55);
+    k230.setTrackModel(TRACK_LOW | TRACK_HIGH);
+    carSleep(200); // 等待摄像头稳定
+
+    unsigned long startTime = millis();
+    while (millis() - startTime < trimOutTimeMs) {
+        acceptTrackFlag();
+
+        float offsetLow = trackRowResultLow.offset;
+        float offsetHigh = trackRowResultHigh.offset;
+
+        if (abs(offsetHigh - offsetLow) == 0) {
+            break;
+        }
+
+        float finallyOffset = offsetHigh - offsetLow;
+
+        trimCar(&trackRowResultHigh, finallyOffset);
+
+        DCMotor.Stop();
+
+    }
+
+    k230.setCameraSteeringGearAngle(angle);
+    k230.setTrackModel(trackModel);
+    carSleep(200); // 恢复原始状态的稳定时间
+}
 
 /*const float KP_ANGLE = 40.0; // 方向误差比例系数（角度调整）
 const float KP_POSITION = 20.0; // 位置误差比例系数（中线调整）
@@ -995,11 +1664,11 @@ void Car::trimCar() {
 
     unsigned long startTime = millis();
 
-    while (millis() - startTime < trimOutTime_ms) {
+    while (millis() - startTime < trimOutTimeMs) {
         acceptTrackFlag();
 
-        float angleError = trackResult.highOffset - trackResult.lowOffset;
-        float positionError = (trackResult.highOffset + trackResult.lowOffset) / 2.0f;
+        float angleError = highOffset - lowOffset;
+        float positionError = (highOffset + lowOffset) / 2.0f;
         float adjustment = (KP_ANGLE * angleError) + (KP_POSITION * positionError);
 
         if (fabs((double) angleError) < 0.1 && fabs((double) positionError) < 0.1) {
@@ -1018,21 +1687,171 @@ void Car::trimCar() {
 
 
 bool Car::acceptTrackFlag() {
-    bool successful = k230.getTrackFlagBit(&trackResult.flagBitArray[0], &trackResult.flagBitArray[1]);
+    bool successful = k230.getTrackFlagBit(flagBitArray);
 
     if (successful) {
-        trackResult.flagBit = trackResult.flagBitArray[0] << 8 | trackResult.flagBitArray[1];
-        centralPoint((uint8_t*) &trackResult.flagBitArray, 2, nullptr, &trackResult.offset);
-        trackResult.bitCount = countBits(trackResult.flagBitArray, 2);
-        trackResult.centerBitCount = countBits(trackResult.flagBitArray, 2, 4, 12);
-        trackResult.edgeBitCount = trackResult.bitCount - trackResult.centerBitCount;
+
+        uint8_t tackModel = k230.getTrackModelCache();
+
+        if (tackModel & TRACK_HIGH) {
+            acceptTrackRowFlag(&trackRowResultHigh);
+        }
+        if (tackModel & TRACK_MIDDLE) {
+            acceptTrackRowFlag(&trackRowResult);
+        }
+        if (tackModel & TRACK_LOW) {
+            acceptTrackRowFlag(&trackRowResultLow);
+        }
     }
 
     return successful;
 }
 
+void Car::acceptTrackRowFlag(TrackRowResult* trackRowResult) {
+    trackRowResult->flagBit = trackRowResult->flagBitArray[0] << 8 | trackRowResult->flagBitArray[1];
+    centralPoint(trackRowResult->flagBitArray, 2, nullptr, &trackRowResult->offset);
+    trackRowResult->bitCount = countBits(trackRowResult->flagBitArray, 2);
+    trackRowResult->centerBitCount = countBits(trackRowResult->flagBitArray, 2, 4, 12);
+    trackRowResult->edgeBitCount = trackRowResult->bitCount - trackRowResult->centerBitCount;
+}
 
-AlarmDesk alarmDeskA(0x07);
+void Car::ledShine(int number, int wait) {
+    for (int i = 0; i < number; ++i) {
+        carLight.LeftTurnOn();
+        carLight.RightTurnOn();
+        delay(wait);
+        carLight.LeftTurnOff();
+        carLight.RightTurnOff();
+    }
+}
+
+
+void SandTable::adjustDirection(Pos pos, Direction current, Direction target) {
+    if (current == target) {
+        return;
+    }
+
+    if (unpack(pos) == assembly("B6") && target == D_RIGHT) {
+
+        car.turnLeft();
+        car.recoil(500);
+        car.trimCar();
+        car.advance(50);
+
+        return;
+    }
+
+    switch (current) {
+        case D_UP:
+            switch (target) {
+                case D_UNDER:
+                    car.trackTurnLeft();
+                    car.trackTurnLeft();
+                    break;
+                case D_LEFT:
+                    car.trackTurnLeft();
+                    break;
+                case D_RIGHT:
+                    car.trackTurnRight();
+                    break;
+            }
+            break;
+        case D_UNDER:
+            switch (target) {
+                case D_UP:
+                    car.trackTurnLeft();
+                    car.trackTurnLeft();
+                    break;
+                case D_LEFT:
+                    car.trackTurnRight();
+                    break;
+                case D_RIGHT:
+                    car.trackTurnLeft();
+                    break;
+            }
+            break;
+        case D_LEFT:
+            switch (target) {
+                case D_UP:
+                    car.trackTurnRight();
+                    break;
+                case D_UNDER:
+                    car.trackTurnLeft();
+                    break;
+                case D_RIGHT:
+                    car.trackTurnLeft();
+                    car.trackTurnLeft();
+                    break;
+            }
+            break;
+        case D_RIGHT:
+            switch (target) {
+                case D_UP:
+                    car.trackTurnLeft();
+                    break;
+                case D_UNDER:
+                    car.trackTurnRight();
+                    break;
+                case D_LEFT:
+                    car.trackTurnLeft();
+                    car.trackTurnLeft();
+                    break;
+            }
+            break;
+    }
+
+    car.trimCar();
+}
+
+void SandTable::move(Pos a, Pos b) {
+    if (unpack(a) == assembly("B6") && unpack(a) == assembly("D6")) {
+        car.overspecificRelief();
+        car.trackAdvanceToNextJunction();
+        return;
+    }
+    car.trackAdvanceToNextJunction();
+}
+
+void SandTable::moveTo(Pos startPosition, Direction startDirection, Pos endPos, Direction* endDirection) {
+    int dx = endPos.x - startPosition.x;
+    int dy = endPos.y - startPosition.y;
+
+    int x_step = dx / 2;
+    Direction x_dir = x_step > 0 ? D_RIGHT : D_LEFT;
+
+    int y_step = dy / 2;
+    Direction y_dir = y_step > 0 ? D_UNDER : D_UP;
+
+    Direction current_dir = startDirection;
+
+    Pos _s = startPosition;
+
+    if (x_step > 0) {
+        adjustDirection(_s, current_dir, x_dir);
+        for (int i = 0; i < x_step; ++i) {
+            car.trackAdvanceToNextJunction();
+        }
+        current_dir = x_dir;
+        _s.x = endPos.x;
+    }
+
+    // 处理y轴移动
+    if (y_step > 0) {
+        adjustDirection(_s, current_dir, y_dir);
+        for (int i = 0; i < y_step; ++i) {
+            car.trackAdvanceToNextJunction();
+        }
+        current_dir = y_dir;
+    }
+
+    *endDirection = current_dir;
+}
+
+
+#pragma clang diagnostic pop
+
+MessageBus messageBus;
+
 BarrierGate barrierGateA(0x03);
 BusStop busStopA(0x06);
 Monitor monitorA(0x04);
@@ -1042,7 +1861,20 @@ TrafficLight trafficLightA(0x0E);
 TrafficLight trafficLightB(0x0F);
 TrafficLight trafficLightC(0x13);
 TrafficLight trafficLightD(0x14);
-StreetLamp streetLampA(0xFF);
-K230 k230(0x02);
+WirelessCharging wirelessChargingA(0x0A);
+InformationDisplay informationDisplayA(0x0B);
+InformationDisplay informationDisplayB(0x08);
+InformationDisplay informationDisplayC(0x12);
 
-Car car;
+AlarmDesk alarmDeskA(0x07);
+StreetLamp streetLampA(0xFF);
+StereoscopicDisplay stereoscopicDisplayA(0x11);
+
+UltrasonicDevice ultrasonicDevice;
+K230 k230(0x02);
+NetSynchronization netSynchronization;
+Car car(0x02);
+MainCar mainCar(0x01);
+
+SandTable sandTable;
+

@@ -199,10 +199,7 @@ def handleInstruction(buf):
         return
     if buf[2] == 0x91:
         if buf[3] == 0x01:
-            if buf[4] == 0x01:
-                setTrack(True)
-            if buf[4] == 0x02:
-                setTrack(False)
+            setTrack(buf[4])
         if buf[3] == 0x02:
             byte = buf[4]
             angle = (byte ^ 0x80) - 0x80
@@ -302,7 +299,11 @@ def setCameraSteeringGearAngle(angle):
 
 
 # region 寻迹
-openTrack = False
+openTrack = 0
+
+TRACK_LOW = 1 << 0
+TRACK_MIDDLE = 1 << 1
+TRACK_HIGH = 1 << 2
 
 ## ROI区域权重值
 # ROIS_WEIGHT = [1, 1, 1, 1]
@@ -310,8 +311,6 @@ openTrack = False
 # DISTORTION_FACTOR = 1  # 设定畸变系数
 # IMG_WIDTH = 240
 # IMG_HEIGHT = 320
-
-trackFlagBit = 0
 
 # trackFlagBitHigh = 0
 # trackFlagBitLow = 0
@@ -322,12 +321,14 @@ trackFlagBit = 0
 # LOW_RECTANGLES_ROTATIONAL_TIME = [(160, 5), (160, 35), (160, 65), (160, 95), (160, 125), (160, 155), (160, 185), (160, 215)]
 # LOW_RECTANGLES = [(60, 5), (60, 35), (60, 65), (60, 95), (60, 125), (60, 155), (60, 185), (60, 215)]
 
+RECTANGLES_HIGH = []
 RECTANGLES = []
+RECTANGLES_HIGH_LOW = []
 
 # RECTANGLES = HIGH_RECTANGLES + LOW_RECTANGLES
 # RECTANGLES_ROTATIONAL_TIME = HIGH_RECTANGLES + LOW_RECTANGLES_ROTATIONAL_TIME
 
-LINE_COLOR_THRESHOLD = [(0, 45)]
+LINE_COLOR_THRESHOLD = [(0, 40)]
 
 
 def initTrack():
@@ -336,7 +337,9 @@ def initTrack():
 
     for i in range(0, 16):
         y = 8 + i * 14
+        RECTANGLES_HIGH_LOW.append((60, y))
         RECTANGLES.append((160, y))
+        RECTANGLES_HIGH.append((260, y))
         pass
 
     pass
@@ -347,83 +350,55 @@ def track(img, outImg=None, sendRecognize=False):
     # trackFlagBitHigh = 0
     # trackFlagBitLow = 0
 
-    global trackFlagBit
-    trackFlagBit = 0
+    list = [
+        RECTANGLES_HIGH if (openTrack & TRACK_LOW) != 0 else None,
+        RECTANGLES if (openTrack & TRACK_MIDDLE) != 0 else None,
+        RECTANGLES_HIGH_LOW if (openTrack & TRACK_HIGH) != 0 else None
+    ]
 
-    for i, (x, y) in enumerate(RECTANGLES):
-        w, h = 20, 20
-        blobs = img.find_blobs(LINE_COLOR_THRESHOLD, roi=(x, y, w, h))
-        for blob in blobs:
-            if blob.area() > 100:
-                if outImg is not None:
-                    outImg.draw_rectangle(x, y, 20, 20, color=(0, 255, 0), thickness=2, fill=True)
-                    outImg.draw_string(x, y, str(i))
+    listValue = [0, 0, 0]
 
-                trackFlagBit |= 1 << (16 - i)
+    for i, (e) in enumerate(list):
+        if e is None:
+            continue
+        for ii, (x, y) in enumerate(e):
+            w, h = 20, 20
+            blobs = img.find_blobs(LINE_COLOR_THRESHOLD, roi=(x, y, w, h))
+            for blob in blobs:
+                if blob.area() > 100:
+                    if outImg is not None:
+                        outImg.draw_rectangle(x, y, 20, 20, color=(0, 255, 0), thickness=2, fill=True)
+                        outImg.draw_string(x, y, str(ii))
 
-                break
-        pass
+                    listValue[i] |= 1 << (15 - ii)
 
-    # 高位判断
-    # for i, (x, y) in enumerate(HIGH_RECTANGLES):
-    #    w, h = 20, 20
-    #    blobs = img.find_blobs(LINE_COLOR_THRESHOLD, roi=(x, y, w, h))
-    #    # 检查是否有任意一个色块的阈值大于 100。高位判断
-    #    for blob in blobs:
-    #        if blob.area() > 100:
-    #            if outImg is not None:
-    #                outImg.draw_rectangle(x, y, 20, 20, color=(0, 255, 0), thickness=2, fill=True)
-    #                outImg.draw_string(x, y, str(i))
-    #            _rackFlagBit_high |= 1 << (7 - i)
-    #            break
-    #            # why 为啥不是  _rackFlagBit |= 1 << i
-    #            # no why
-    #            # 请渡学长的遗物
-    #            # bools = [False] * 8
-    #            # .....
-    #            # bools[i] = True
-    #            # .....
-    #            # binary_str = ''.join(['1' if b else '0' for b in bools])
-    #            # hex_value = int(binary_str, 2)
-    ## 低位判断
-    # for i, (x, y) in enumerate(LOW_RECTANGLES):
-    #    w, h = 20, 20
-    #    # 低位检测使用不同的ROI，向下偏移一定距离
-    #    roi_low = (x, y, w, h)
-    #    blobs = img.find_blobs(LINE_COLOR_THRESHOLD, roi=roi_low)
-    #    for blob in blobs:
-    #        if blob.area() > 100:
-    #            if outImg is not None:
-    #                # 为了与绘制的矩形保持一致，这里也可以选择绘制在 roi_low 位置
-    #                outImg.draw_rectangle(x, y, 20, 20, color=(0, 255, 0), thickness=2, fill=True)
-    #                outImg.draw_string(x - 200, y, str(i))
-    #            _rackFlagBit_low |= 1 << (7 - i)
-    #            break
+                    break
+            pass
 
     if sendRecognize:
-        sendTrack(None)
+        send([
+            DATA_FRAME_HEADER,
+            NATIVE_IDENTIFIER,
+            0x91,
+            0x01,
+            (listValue[0] >> 8) & 0xFF,
+            listValue[0] & 0xFF,
+            (listValue[1] >> 8) & 0xFF,
+            listValue[1] & 0xFF,
+            (listValue[2] >> 8) & 0xFF,
+            listValue[2] & 0xFF,
+            0x00,
+            DATA_FRAME_TAIL
+        ])
 
     pass
 
 
-def sendTrack(e):
-    send([
-        DATA_FRAME_HEADER,
-        NATIVE_IDENTIFIER,
-        0x91,
-        0x01,
-        (trackFlagBit >> 8) & 0xFF,
-        trackFlagBit & 0xFF,
-        0x00,
-        DATA_FRAME_TAIL
-    ])
-
-
-def setTrack(open):
+def setTrack(model):
     global openTrack
     if isDebug:
-        log("setTrack:" + str(open))
-    openTrack = open
+        log("setTrack:" + str(model))
+    openTrack = model
     pass
 
 
@@ -499,9 +474,6 @@ def setTrack(open):
 
 # region 二维码
 def qrRecognize(img, outImg=None, sendRecognize=True):
-    global openTrack
-    openTrack = False
-
     if isDebug:
         log("qrRecognize...")
         pass
@@ -541,7 +513,7 @@ def qrRecognize(img, outImg=None, sendRecognize=True):
                 color = (0, 255, 0)
             if colorId == YELLOW:
                 color = (255, 255, 0)
-            img.draw_rectangle(qr.rect())
+            img.draw_rectangle(qr.rect(), color=color)
             x, y, w, h = qr.rect()
             img.draw_string(
                 x,
@@ -617,9 +589,6 @@ TL_YELLOW_RADIUS = [
 
 
 def trafficLightRecognize(img, outImg=None, sendRecognize=True):
-    global openTrack
-    openTrack = False
-
     if isDebug:
         log("trafficLightRecognize...")
         pass
@@ -688,9 +657,6 @@ def trafficLightRecognize(img, outImg=None, sendRecognize=True):
 
 # region PING
 def pinged():
-    global openTrack
-    openTrack = False
-
     buf = [
         DATA_FRAME_HEADER,
         NATIVE_IDENTIFIER,
@@ -766,10 +732,12 @@ if __name__ == '__main__':
 
             # trafficLightRecognize(primitiveImg, img, False)
 
-            if openTrack:
+            if openTrack != 0:
                 track(primitiveImg, img, True)
 
-            drawLogs(img)
+            # drawLogs(img)
+
+            # qrRecognize()
 
             lcd.display(img)
         except Exception as err:
