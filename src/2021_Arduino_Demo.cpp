@@ -369,12 +369,19 @@ void questions5() {
     }
 }
 
+bool renderToScreen = false;
+uint8_t cameraState = CAMERA_RGB565;
+
 void keyHandler(uint8_t k_value) {
 #if DE_BUG
     Serial.print("KEY_Handler:");
     logHex(k_value);
     Serial.println();
 #endif
+
+    CoreBeep.TurnOn();
+    sleep(100);
+    CoreBeep.TurnOff();
 
     uint8_t level;
 
@@ -384,19 +391,28 @@ void keyHandler(uint8_t k_value) {
 
     switch (k_value) {
         case 0x01:
-            questions5();
-
+            //questions5();
+            carTest.overspecificReliefTest();
             break;
         case 0x02:
             //carTest.advanceCorrectionTest();
 
             netSynchronization.synchronousGlobalVariable('q', 0);
+            //carTest.overspecificReliefTest();
+
             break;
         case 0x03:
 
-            barrierGateA.setLicensePlateData(licensePlateBuf);
+            cameraState++;
+            if (cameraState > CAMERA_GRAYSCALE_LOW_GAIN) {
+                cameraState = 1;
+            }
 
-            netSynchronization.synchronousLicensePlateNumber((uint8_t*) "A12345");
+            k230.setCameraState((CameraState) cameraState);
+
+            /*     barrierGateA.setLicensePlateData(licensePlateBuf);
+
+                 netSynchronization.synchronousLicensePlateNumber((uint8_t*) "A12345");*/
 
 /*
             k230.setTrackModel(TRACK_MIDDLE);
@@ -440,13 +456,8 @@ void keyHandler(uint8_t k_value) {
             break;
         case 0x04:
 
-            //carTest.figureEightCycle();
-            /*k230.setCameraSteeringGearAngle(-55);
-            k230.setTrackModel(TRACK_MIDDLE);
-
-            car.trackTurnLeft();
-
-            k230.setTrackModel(0);*/
+            renderToScreen = !renderToScreen;
+            k230.setRenderToScreen(renderToScreen);
 
             break;
     }

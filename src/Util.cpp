@@ -153,7 +153,6 @@ bool equals(uint16_t* a, uint16_t* b, uint8_t len) {
     return true;
 }
 
-
 TrafficLightModel k230ColorToTrafficLightModel(K210Color k210Color) {
     switch (k210Color) {
         case K_RED :
@@ -202,7 +201,6 @@ Pos pack(uint16_t v) {
 uint16_t unpack(Pos pos) {
     return pos.x << 8 | pos.y;
 }
-
 
 uint8_t getBit(const uint8_t* value, uint32_t len, int32_t bit, bool fromLeftToRight) {
     if (bit < 0 || bit >= len * 8) {
@@ -442,7 +440,6 @@ static void apply_op(uint8_t op, OperandStack* os) {
     push_operand(os, res);
 }
 
-/* 主函数 */
 int16_t evaluateTheExpression(const uint8_t* expr, uint16_t var[]) {
     OperandStack op_stack;
     OperatorStack oper_stack;

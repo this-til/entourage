@@ -240,4 +240,11 @@ enum Direction {
 
 };
 
+enum CameraState {
+    CAMERA_RGB565 = 0x01,
+    CAMERA_RGB565_LOW_GAIN = 0x02,
+    CAMERA_GRAYSCALE = 0x03,
+    CAMERA_GRAYSCALE_LOW_GAIN = 0x04,
+};
+
 #endif //ENTOURAGE_CLION_ENUM_H

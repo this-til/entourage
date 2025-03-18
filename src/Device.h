@@ -8,10 +8,22 @@
 //哄老母鸡被迫留下来的痔疮代码
 #define FOR_THE_KING_HEN true
 
-#define DETECTED_VALUE_CHANGE(name)                                                                                     \
+
+#define SEND(buf, len) SEND_ALL(buf, len , 0x6008, true, 300)
+
+#define SEND_ALL(buf, len, bus, verify, sendCoolingMs)                                                                  \
+messageBus.send(buf, len, bus, verify);                                                                                 \
+sleep(sendCoolingMs);                                                                                                   \
+
+#define DETECTED_VALUE_CHANGE(name) SEND_AND_DETECTED_VALUE_CHANGE(;, name)
+#define TWO_DETECTED_VALUE_CHANGE(name1, name2) TWO_SEND_AND_DETECTED_VALUE_CHANGE(;,name1, name2)
+#define THERE_DETECTED_VALUE_CHANGE(name1, name2, name3) THERE_SEND_AND_DETECTED_VALUE_CHANGE(;,name1, name2, name3)
+
+#define SEND_AND_DETECTED_VALUE_CHANGE(send, name)                                                                      \
 unsigned long startTime = millis();                                                                                     \
 uint8_t name##Version = this->name##Version;                                                                            \
 while (millis() - startTime < 1000) {                                                                                   \
+    send                                                                                                                \
     if(name##Version != this->name##Version) {                                                                          \
         if ((name) != nullptr) {                                                                                        \
             *(name) = this->name;                                                                                       \
@@ -22,10 +34,12 @@ while (millis() - startTime < 1000) {                                           
 }                                                                                                                       \
 return false;                                                                                                           \
 
-#define TWO_DETECTED_VALUE_CHANGE(name1, name2)                                                                         \
+
+#define TWO_SEND_AND_DETECTED_VALUE_CHANGE(send, name1, name2)                                                          \
 unsigned long startTime = millis();                                                                                     \
 uint8_t name1##_##name2##Version = this->name1##_##name2##Version;                                                      \
 while (millis() - startTime < 1000) {                                                                                   \
+    send                                                                                                                \
     if(name1##_##name2##Version != this->name1##_##name2##Version) {                                                    \
         if ((name1) != nullptr) {                                                                                       \
             *(name1) = this->name1;                                                                                     \
@@ -39,11 +53,12 @@ while (millis() - startTime < 1000) {                                           
 }                                                                                                                       \
 return false;                                                                                                           \
 
-#define THERE_DETECTED_VALUE_CHANGE(name1, name2, name3)                                                                \
+#define THERE_SEND_AND_DETECTED_VALUE_CHANGE(send, name1, name2, name3)                                                 \
 unsigned long startTime = millis();                                                                                     \
     uint8_t name1##_##name2##_##name3##Version = this->name1##_##name2##_##name3##Version;                              \
     while (millis() - startTime < 1000) {                                                                               \
     if(name1##_##name2##_##name3##Version != this->name1##_##name2##_##name3##Version) {                                \
+        send                                                                                                            \
         if ((name1) != nullptr) {                                                                                       \
             *(name1) = this->name1;                                                                                     \
         }                                                                                                               \
@@ -128,6 +143,10 @@ public:
     void send(uint8_t* buf, uint8_t len, uint16_t bus = 0x6008, bool addVerify = true, unsigned long sendCoolingMs = 300);
 
     bool sendAndWait(uint8_t* buf, uint8_t len, const uint8_t* returnCount, uint16_t bus = 0x6008, bool addVerify = true, unsigned long sendCoolingMs = 300, unsigned long maxWaitingTimeMs = 5000);
+
+    bool sendAndWait(uint8_t* buf, uint8_t len, uint8_t* backBuf, uint8_t id, const uint8_t* serviceId, uint8_t serviceLen, uint16_t bus = 0x6008, bool verify = true, unsigned long readOutTimeMs = 1000);
+
+    bool sendAndWait(uint8_t* buf, uint8_t len, uint8_t* backBuf, uint8_t id, uint8_t serviceId, uint16_t bus = 0x6008, bool verify = true, unsigned long readOutTimeMs = 1000);
 
     bool check(const uint8_t* buf, uint8_t len, uint8_t id, const uint8_t* serviceId, uint8_t serviceLen, bool verify = true);
 
@@ -215,6 +234,8 @@ public:
      * "智能道闸标志物处于关闭状态时请求回传状态，不会回传任何指令。"
      */
     bool getGateControl();
+
+    void onReceiveZigbeeMessage(uint8_t* buf) override;
 
 };
 
@@ -616,6 +637,12 @@ public:
 
     uint8_t getTrackModelCache();
 
+    void setCameraState(enum CameraState cameraState);
+
+    void setDebug(bool open);
+
+    void setRenderToScreen(bool open);
+
     /***
      * 获取寻迹标志位
      *
@@ -659,6 +686,8 @@ private:
     uint8_t trackModel{};
     bool receiveTrack;
     int8_t cameraSteeringGearAngle{};
+
+
 };
 
 struct TrackRowResult {
@@ -814,8 +843,7 @@ public:
      */
     uint16_t globalVariable[256] = {};
     uint8_t globalVariableVersion[256] = {};
-
-    uint8_t globalVariableReturnCount = 0;
+    uint8_t globalVariableReturnCount[256] = {};
 
     /***
     * 自动同步一个全局数据
