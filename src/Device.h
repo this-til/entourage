@@ -144,10 +144,6 @@ public:
 
     bool sendAndWait(uint8_t* buf, uint8_t len, const uint8_t* returnCount, uint16_t bus = 0x6008, bool addVerify = true, unsigned long sendCoolingMs = 300, unsigned long maxWaitingTimeMs = 5000);
 
-    bool sendAndWait(uint8_t* buf, uint8_t len, uint8_t* backBuf, uint8_t id, const uint8_t* serviceId, uint8_t serviceLen, uint16_t bus = 0x6008, bool verify = true, unsigned long readOutTimeMs = 1000);
-
-    bool sendAndWait(uint8_t* buf, uint8_t len, uint8_t* backBuf, uint8_t id, uint8_t serviceId, uint16_t bus = 0x6008, bool verify = true, unsigned long readOutTimeMs = 1000);
-
     bool check(const uint8_t* buf, uint8_t len, uint8_t id, const uint8_t* serviceId, uint8_t serviceLen, bool verify = true);
 
     bool check(const uint8_t* buf, uint8_t len, uint8_t id, uint8_t serviceId, bool verify = true);
@@ -682,6 +678,8 @@ public:
 
     //void loop();
 
+    void clearSerialPort();
+
 private:
     uint8_t trackModel{};
     bool receiveTrack;
@@ -751,19 +749,31 @@ public:
      * 前进一段距离
      * 无寻迹
      */
+    void advance(int16_t speed, uint16_t distance);
+
     void advance(uint16_t distance);
 
 /***
  * 后退一定距离
  * 无寻迹
  */
+    void recoil(uint16_t speed, uint16_t distance);
+
     void recoil(uint16_t distance);
 
     void trackTurnLeft();
 
+    void trackTurnLeft(uint16_t speed);
+
     void trackTurnRight();
 
+    void trackTurnRight(uint16_t speed);
+
+    void turnLeft(uint16_t speed, uint8_t angle = 90);
+
     void turnLeft(uint8_t angle = 90);
+
+    void turnRight(uint16_t speed, uint8_t angle = 90);
 
     void turnRight(uint8_t angle = 90);
 
@@ -776,6 +786,7 @@ public:
 
     /***
      * 矫正车身，与寻迹线平行
+     * 不太稳定-弃用
      */
     void rightCar();
 
@@ -787,6 +798,7 @@ public:
 
     /***
      * 来回式调整
+     * 不太稳定-弃用
      * @param step
      */
     void mobileCorrection(uint16_t step);
@@ -824,6 +836,7 @@ private:
     void waitCodeDisc(int16_t distance);
 
     void acceptTrackRowFlag(TrackRowResult* trackRowResult);
+
 };
 
 class MainCar : public DeviceBase {

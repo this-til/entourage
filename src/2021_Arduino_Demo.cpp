@@ -74,6 +74,11 @@ void TaskMain::setup() {
  */
 void TaskMain::loop() {
     CoreKEY.Kwhile(keyHandler);
+
+    /*Serial.print("[DEBUG] getCodeDisc:");
+    Serial.print(car.getCodeDisc());
+    Serial.println();*/
+
 }
 
 void TaskCar::setup() {
@@ -293,12 +298,12 @@ void questions5() {
     }
 
     car.trackAdvanceToNextJunction(); //B2->B4
-
-    car.turnLeft(60);
+    car.trimCar();
+    car.turnLeft(40, 45);
     sleep(500);
     stereoscopicDisplayA.showLicensePlate(licensePlateBuf, 0, 0);
     sleep(500);
-    car.turnRight(60);
+    car.turnRight(40, 45);
     car.trimCar();
 
     uint16_t* _path = path + 2;
@@ -397,18 +402,22 @@ void keyHandler(uint8_t k_value) {
         case 0x02:
             //carTest.advanceCorrectionTest();
 
-            netSynchronization.synchronousGlobalVariable('q', 0);
+            //netSynchronization.synchronousGlobalVariable('q', 0);
             //carTest.overspecificReliefTest();
+
+            carTest.trackTurnLeftTest();
 
             break;
         case 0x03:
 
-            cameraState++;
-            if (cameraState > CAMERA_GRAYSCALE_LOW_GAIN) {
-                cameraState = 1;
-            }
+            carTest.turnLeftTest();
 
-            k230.setCameraState((CameraState) cameraState);
+            /*   cameraState++;
+               if (cameraState > CAMERA_GRAYSCALE_LOW_GAIN) {
+                   cameraState = 1;
+               }
+
+               k230.setCameraState((CameraState) cameraState);*/
 
             /*     barrierGateA.setLicensePlateData(licensePlateBuf);
 

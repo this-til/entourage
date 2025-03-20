@@ -28,16 +28,15 @@ void CarTest::figureEightCycle() {
     k230.setTrackModel(TRACK_MIDDLE);
     for (int i = 0; i < 100; ++i) {
         car.trackAdvanceToNextJunction();
-
         car.turnLeft();
+
         car.recoil(500);
         car.trimCar();
         //car.recoilToNextJunction();
         car.advance(50);
         car.overspecificRelief();
-
-
         car.trackAdvanceToNextJunction();
+
         car.trackTurnLeft();
         car.trackAdvanceToNextJunction();
         car.trackTurnLeft();
@@ -78,6 +77,20 @@ void CarTest::overspecificReliefTest() {
 
 
     k230.setTrackModel(0);
+}
+
+void CarTest::turnLeftTest() {
+    k230.setCameraSteeringGearAngle(-55);
+    k230.setTrackModel(TRACK_MIDDLE);
+    car.turnLeft();
+    k230.setTrackModel(false);
+}
+
+void CarTest::trackTurnLeftTest() {
+    k230.setCameraSteeringGearAngle(-55);
+    k230.setTrackModel(TRACK_MIDDLE);
+    car.trackTurnLeft();
+    k230.setTrackModel(false);
 }
 
 void CarTest::trackAdvanceToNextJunctionTest() {

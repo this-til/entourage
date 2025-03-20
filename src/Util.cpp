@@ -165,25 +165,79 @@ TrafficLightModel k230ColorToTrafficLightModel(K210Color k210Color) {
     return YELLOW;
 }
 
+const uint8_t bit_counts[] = {
+        0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7, 4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8
+};
+
+
 uint32_t countBits(const uint8_t* value, uint32_t len) {
-    uint32_t count = 0;
-    for (uint32_t i = 0; i < len; ++i) {
-        for (uint8_t ii = 0; ii < 8; ii++) {
-            if (value[i] & (1 << ii)) {
-                count++;
-            }
-        }
+    //return countBits(value, len, 0, len * 8);
+
+    uint32_t add = 0;
+    for (int i = 0; i < len; ++i) {
+        add += bit_counts[value[i]];
     }
-    return count;
+    return add;
 }
 
 uint32_t countBits(const uint8_t* value, uint32_t len, uint32_t starting, uint32_t end) {
-    uint32_t count = 0;
+    /*uint32_t count = 0;
     for (uint32_t i = starting; i < end; ++i) {
         if (getBit(value, len, (int32_t) i, true)) {
             count++;
         }
     }
+    return count;*/
+    
+    if (starting >= end || end > len * 8) {
+        return 0;
+    }
+
+    uint32_t start_byte = starting / 8;
+    uint32_t end_byte = (end - 1) / 8;
+
+    if (start_byte >= len || end_byte >= len) {
+        return 0;
+    }
+
+    // Convert to bit positions within the byte (0 is the highest bit, 7 is the lowest)
+    uint32_t s_bit = 7 - (starting % 8);
+    uint32_t e_bit = 7 - ((end - 1) % 8);
+
+    uint32_t count = 0;
+
+    if (start_byte == end_byte) {
+        // Handle single byte
+        if (s_bit >= e_bit) {
+            uint32_t mask_bits = s_bit - e_bit + 1;
+            uint8_t mask = ((1 << mask_bits) - 1) << e_bit;
+            count += bit_counts[value[start_byte] & mask];
+        }
+    } else {
+        // Process start byte
+        uint32_t mask_bits = s_bit + 1;
+        uint8_t mask = (1 << mask_bits) - 1;
+        count += bit_counts[value[start_byte] & mask];
+
+        // Process full bytes between start and end
+        for (uint32_t i = start_byte + 1; i < end_byte; ++i) {
+            count += bit_counts[value[i]];
+        }
+
+        // Process end byte
+        mask_bits = 7 - e_bit + 1;
+        mask = ((1 << mask_bits) - 1) << e_bit;
+        count += bit_counts[value[end_byte] & mask];
+    }
+
+
     return count;
 }
 
@@ -203,7 +257,7 @@ uint16_t unpack(Pos pos) {
 }
 
 uint8_t getBit(const uint8_t* value, uint32_t len, int32_t bit, bool fromLeftToRight) {
-    if (bit < 0 || bit >= len * 8) {
+/*    if (bit < 0 || bit >= len * 8) {
         return false;
     }
 
@@ -211,7 +265,12 @@ uint8_t getBit(const uint8_t* value, uint32_t len, int32_t bit, bool fromLeftToR
         return (value[bit / 8] >> (7 - (bit % 8))) & 0x01;
     } else {
         return value[len - (bit / 8) - 1] >> (bit % 8) & 0x01;
-    }
+    }*/
+    if (bit < 0 || bit >= len * 8) return 0;
+    // 位运算替代除模运算，消除分支
+    const uint32_t byteIdx = fromLeftToRight ? (bit >> 3) : (len - (bit >> 3) - 1);
+    const uint8_t bitOffset = fromLeftToRight ? (7 - (bit & 7)) : (bit & 7);
+    return (value[byteIdx] >> bitOffset) & 0x01;
 }
 
 void setBit(uint8_t* value, uint32_t len, int32_t bit, bool set, bool fromLeftToRight) {
@@ -264,46 +323,131 @@ void lonelinessExclusion(uint8_t* value, uint32_t len, uint8_t* outValue) {
 
 }
 
-float centralPoint(uint8_t* value, uint32_t len, float* centerShift, float* centerShiftOne) {
-    uint32_t mLen = len * 8;
-    float startingPoint = -1;
-    float endPoint = -1;
+static const int highest_bit_table[256] = {
+        -1, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+        5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+        6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+        6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+        6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+        6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7
+};
 
-    for (int32_t i = 0; i < mLen; ++i) {
-        bool bit = getBit(value, len, i, true);
-        if (bit) {
-            startingPoint = (float) i;
+static const int lowest_bit_table[256] = {
+        -1, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+        4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+        5, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+        4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+        6, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+        4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+        5, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+        4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+        7, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+        4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+        5, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+        4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+        6, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+        4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+        5, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
+        4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0
+};
+
+float centralPoint(uint8_t* value, uint32_t len, float* centerShift, float* centerShiftOne) {
+    /* uint32_t mLen = len * 8;
+     float startingPoint = -1;
+     float endPoint = -1;
+
+     for (int32_t i = 0; i < mLen; ++i) {
+         bool bit = getBit(value, len, i, true);
+         if (bit) {
+             startingPoint = (float) i;
+             break;
+         }
+     }
+
+     if (startingPoint == -1) {
+         if (centerShift != nullptr) {
+             *centerShift = 0;
+         }
+         if (centerShiftOne != nullptr) {
+             *centerShiftOne = 0;
+         }
+         return 0;
+     }
+
+     for (int32_t i = 0; i < mLen; ++i) {
+         bool bit = getBit(value, len, i, false);
+         if (bit) {
+             endPoint = (float) (mLen - i - 1);
+             break;
+         }
+     }
+
+     float centralPoint = startingPoint + ((endPoint - startingPoint) / 2);
+     centralPoint += 0.5;
+     float _centerShift = centralPoint - (float) mLen / 2;
+     if (centerShift != nullptr) {
+         *centerShift = _centerShift;
+     }
+     if (centerShiftOne != nullptr) {
+         *centerShiftOne = _centerShift / ((float) mLen / 2 - 0.5f);
+     }
+     return centralPoint;*/
+
+    const uint32_t mLen = len * 8;
+    int16_t startingPoint = -1;
+    int16_t endPoint = -1;
+
+    // Find the first set bit from left to right (startingPoint)
+    for (uint32_t byte_idx = 0; byte_idx < len; ++byte_idx) {
+        const uint8_t byte_val = value[byte_idx];
+        if (byte_val != 0) {
+            const int highest_bit = highest_bit_table[byte_val];
+            startingPoint = byte_idx * 8 + (7 - highest_bit);
             break;
         }
     }
 
-    if (startingPoint == -1) {
-        if (centerShift != nullptr) {
-            *centerShift = 0;
+    if (startingPoint < 0) { // All bits are zero
+        if (centerShift) {
+            *centerShift = 0.0f;
         }
-        if (centerShiftOne != nullptr) {
-            *centerShiftOne = 0;
+        if (centerShiftOne) {
+            *centerShiftOne = 0.0f;
         }
         return -1;
     }
 
-    for (int32_t i = 0; i < mLen; ++i) {
-        bool bit = getBit(value, len, i, false);
-        if (bit) {
-            endPoint = (float) (mLen - i - 1);
+    // Find the first set bit from right to left (endPoint)
+    for (int32_t byte_idx = len - 1; byte_idx >= 0; --byte_idx) {
+        const uint8_t byte_val = value[byte_idx];
+        if (byte_val != 0) {
+            const int lowest_bit = lowest_bit_table[byte_val];
+            endPoint = byte_idx * 8 + (7 - lowest_bit);
             break;
         }
     }
 
-    float centralPoint = startingPoint + ((endPoint - startingPoint) / 2);
-    centralPoint += 0.5;
-    float _centerShift = centralPoint - (float) mLen / 2;
-    if (centerShift != nullptr) {
+    const float centralPoint = startingPoint + (endPoint - startingPoint) * 0.5f + 0.5f;
+    const float _centerShift = centralPoint - static_cast<float>(mLen) * 0.5f;
+
+    if (centerShift) {
         *centerShift = _centerShift;
     }
-    if (centerShiftOne != nullptr) {
-        *centerShiftOne = _centerShift / ((float) mLen / 2 - 0.5f);
+    if (centerShiftOne) {
+        const float scale = static_cast<float>(mLen) * 0.5f - 0.5f;
+        *centerShiftOne = _centerShift / scale;
     }
+
     return centralPoint;
 }
 

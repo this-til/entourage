@@ -24,6 +24,10 @@ public:
     void advanceCorrectionTest();
 
     void overspecificReliefTest();
+
+    void turnLeftTest();
+
+    void trackTurnLeftTest();
 };
 
 

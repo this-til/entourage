@@ -38,6 +38,7 @@ COLOR_TO_RBG_MAP = {
 
 CAMERA_RGB565 = 0x01
 CAMERA_RGB565_LOW_GAIN = 0x02
+
 CAMERA_GRAYSCALE = 0x03
 CAMERA_GRAYSCALE_LOW_GAIN = 0x04
 
@@ -695,7 +696,7 @@ LINE_HEIGHT = FONT_SIZE + 2  # 行高
 
 log_lines = []
 
-isDebug = True
+isDebug = False
 
 
 def log(msg):

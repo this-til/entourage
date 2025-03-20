@@ -29,11 +29,11 @@ bool equals(uint16_t* a, uint16_t* b, uint8_t len);
 uint32_t countBits(const uint8_t* value, uint32_t len);
 
 /***
- *
+ * 求value中1的数量
  * @param value
  * @param len
- * @param starting  ~ [starting, end)
- * @param end       ~
+ * @param starting  ~ [0, len * 8) 开始的bit索引位置
+ * @param end       ~ (0, len * 8] 结束的bit索引+1的位置
  * @return
  */
 uint32_t countBits(const uint8_t* value, uint32_t len, uint32_t starting, uint32_t end);
