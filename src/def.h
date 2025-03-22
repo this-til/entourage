@@ -4,6 +4,9 @@
 
 
 #define DE_BUG false
+
+#define FLASHEND 0x3FFFF
+
 /*
 #define LOG_LEVEL 4  // 0=OFF,1=ERROR,2=WARN,3=INFO,4=DEBUG
 
@@ -38,6 +41,7 @@
 #include "Enum.h"
 #include "Test.h"
 #include "Cache.h"
+#include "Questions.h"
 
 // 标准无符号类型
 #define uchar  unsigned char

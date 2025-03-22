@@ -195,7 +195,7 @@ uint32_t countBits(const uint8_t* value, uint32_t len, uint32_t starting, uint32
         }
     }
     return count;*/
-    
+
     if (starting >= end || end > len * 8) {
         return 0;
     }
@@ -499,7 +499,7 @@ void excludeSpecialCharacter(const uint8_t* source, uint8_t sourceLen, uint8_t* 
     }
 }
 
-#define MAX_STACK_SIZE 32
+#define MAX_STACK_SIZE 8
 
 typedef struct {
     int16_t data[MAX_STACK_SIZE];
@@ -620,8 +620,9 @@ int16_t evaluateTheExpression(const uint8_t* expr, uint16_t var[]) {
     }
 
     // 处理剩余运算符
-    while (oper_stack.top != -1)
+    while (oper_stack.top != -1) {
         apply_op(pop_operator(&oper_stack), &op_stack);
+    }
 
     return pop_operand(&op_stack);
 }

@@ -771,11 +771,15 @@ public:
 
     void turnLeft(uint16_t speed, uint8_t angle = 90);
 
-    void turnLeft(uint8_t angle = 90);
+    void turnLeft(uint8_t angle);
+
+    void turnLeft();
 
     void turnRight(uint16_t speed, uint8_t angle = 90);
 
-    void turnRight(uint8_t angle = 90);
+    void turnRight(uint8_t angle);
+
+    void turnRight();
 
     /***
      * 微调车姿态
@@ -783,6 +787,14 @@ public:
     void trimCar();
 
     void trimCar(TrackRowResult* trackRowResult, float offset);
+
+    /***
+     * 另一个trimCar方法，
+     * 他比trimCar更好但是需要一条垂直车的黑线
+     *
+     * 感觉可以写成黑白通用的 不管了立个TODO交给学弟了
+     */
+    void trimCarByLine();
 
     /***
      * 矫正车身，与寻迹线平行
@@ -836,7 +848,6 @@ private:
     void waitCodeDisc(int16_t distance);
 
     void acceptTrackRowFlag(TrackRowResult* trackRowResult);
-
 };
 
 class MainCar : public DeviceBase {

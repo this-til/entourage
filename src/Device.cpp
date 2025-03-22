@@ -263,7 +263,7 @@ void AlarmDesk::setOpenCode(uint8_t* data) {
     messageBus.send(buf, 8);
 
     uint8_t buf2[] = {DATA_FRAME_HEADER, id, 0x11, data[2], data[1], data[0], 0x00, DATA_FRAME_TAIL};
-    messageBus.send(buf, 8);
+    messageBus.send(buf2, 8);
 }
 
 
@@ -401,7 +401,7 @@ void Monitor::setDisplayData(uint8_t pos, const uint8_t value[]) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, pos, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     buf[3] = value[0] << 8 | value[1];
     buf[4] = value[2] << 8 | value[3];
-    buf[5] = value[4] << 8 | value[4];
+    buf[5] = value[4] << 8 | value[5];
     messageBus.send(buf, 8);
 
 }
@@ -635,7 +635,7 @@ void StereoscopicDisplay::showTextByZigBee(const uint16_t* gbk, uint8_t len) {
 double UltrasonicDevice::ranging(int sys, int rangeFrequency, int wait) {
     double distance = 0;
     for (int i = 0; i < rangeFrequency; ++i) {
-        distance += Ultrasonic.Ranging(CM);
+        distance += Ultrasonic.Ranging(sys);
         sleep(wait);
     }
     return distance / rangeFrequency;
@@ -1329,6 +1329,14 @@ void Car::turnRight(uint8_t angle) {
     turnRight(turningSpeed, angle);
 }
 
+void Car::turnLeft() {
+    turnLeft(turningSpeed, 90);
+}
+
+void Car::turnRight() {
+    turnRight(turningSpeed, 90);
+}
+
 void Car::trackTurnLeft(uint16_t speed) {
     int8_t angle = k230.getCameraSteeringGearAngleCache();
     k230.setCameraSteeringGearAngle(-80);
@@ -1454,34 +1462,36 @@ void Car::overspecificRelief() {
         trimCar();
     }
 
-    while (millis() - startTime < outTimeMs) {
-        acceptTrackFlag();
+    /* while (millis() - startTime < outTimeMs) {
+         acceptTrackFlag();
 
-        uint8_t lc = countBits(trackRowResult.flagBitArray, 2, 0, 4);
-        uint8_t rc = countBits(trackRowResult.flagBitArray, 2, 12, 16);
+         uint8_t lc = countBits(trackRowResult.flagBitArray, 2, 0, 4);
+         uint8_t rc = countBits(trackRowResult.flagBitArray, 2, 12, 16);
 
-        if (lc == 4 && rc == 4) {
-            break;
-        }
+         if (lc == 4 && rc == 4) {
+             break;
+         }
 
-        if (lc != 0 && rc != 0) {
-            DCMotor.SpeedCtr(
-                    lc > rc
-                    ? -10
-                    : 10,
-                    lc > rc
-                    ? 10
-                    : -10
-            );
+         if (lc != 0 && rc != 0) {
+             DCMotor.SpeedCtr(
+                     lc > rc
+                     ? -10
+                     : 10,
+                     lc > rc
+                     ? 10
+                     : -10
+             );
 
-            sleep(35);
-            DCMotor.Stop();
-        }
+             sleep(35);
+             DCMotor.Stop();
+         }
 
-        advance(10, 10);
-        carSleep(100);
-        continue;
-    }
+         advance(10, 10);
+         carSleep(100);
+         continue;
+     }*/
+
+    trimCarByLine();
 
     advance(1100);
 
@@ -1572,7 +1582,6 @@ void Car::recoilToNextJunction() {
     }
 }
 
-
 void Car::advance(int16_t speed, uint16_t distance) {
     DCMotor.SpeedCtr(
             speed,
@@ -1598,7 +1607,6 @@ void Car::advance(uint16_t distance) {
 void Car::recoil(uint16_t distance) {
     recoil(straightSpeed, distance);
 }
-
 
 void Car::mobileCorrection(uint16_t step) {
     unsigned long startTime = millis();
@@ -1704,6 +1712,42 @@ void Car::trimCar(TrackRowResult* trackRowResult, float offset) {
 #endif
 }
 
+
+void Car::trimCarByLine() {
+
+    unsigned long startTime = millis();
+    while (millis() - startTime < outTimeMs) {
+        acceptTrackFlag();
+
+        uint8_t lc = countBits(trackRowResult.flagBitArray, 2, 0, 4);
+        uint8_t rc = countBits(trackRowResult.flagBitArray, 2, 12, 16);
+
+        if (lc == 4 && rc == 4) {
+            break;
+        }
+
+        if (lc != 0 && rc != 0) {
+            DCMotor.SpeedCtr(
+                    lc > rc
+                    ? -10
+                    : 10,
+                    lc > rc
+                    ? 10
+                    : -10
+            );
+
+            sleep(35);
+            DCMotor.Stop();
+        }
+
+        advance(10, 10);
+        carSleep(100);
+        continue;
+    }
+
+    acceptTrackFlag();
+
+}
 
 /***
  * 矫正车身，与寻迹线平行（增强版）
