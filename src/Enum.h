@@ -69,6 +69,8 @@ enum K210Color {
     K_RED = 0x03,
     K_GREEN = 0x04,
     K_YELLOW = 0x05,
+    //TODO 未实现
+    K_BLUE = 0x06,
 };
 
 enum PageTurningMode {

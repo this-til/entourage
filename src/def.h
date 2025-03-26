@@ -34,6 +34,7 @@
 #include <Arduino.h>
 #include "Ultrasonic.h"
 #include "SCoop.h"
+#include "WString.h"
 
 #include "2021_Arduino_Demo.h"
 #include "Device.h"
@@ -61,7 +62,9 @@
 
 #define DATA_FRAME_HEADER 0x55
 #define DATA_FRAME_TAIL 0xBB
+
 #define BUS_BASE_ADD 0x6008
+#define BUD_K210_RECEIVE 0x6038
 
 #endif //ENTOURAGE_CLION_DEF_H
 

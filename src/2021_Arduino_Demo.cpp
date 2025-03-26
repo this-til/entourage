@@ -235,7 +235,7 @@ void keyHandler(uint8_t k_value) {
 
     switch (k_value) {
         case 0x01:
-            questions.questions10();
+            questions.questions2023();
             //carTest.overspecificReliefTest();
             break;
         case 0x02:
@@ -256,19 +256,19 @@ void keyHandler(uint8_t k_value) {
                    cameraState = 1;
                }
 
-               k230.setCameraState((CameraState) cameraState);*/
+               k210.setCameraState((CameraState) cameraState);*/
 
             /*     barrierGateA.setLicensePlateData(licensePlateBuf);
 
                  netSynchronization.synchronousLicensePlateNumber((uint8_t*) "A12345");*/
 
 /*
-            k230.setTrackModel(TRACK_MIDDLE);
+            k210.setTrackModel(TRACK_MIDDLE);
             carportA.moveToLevel(1);
 
             car.advanceCorrection(50, 6);
 
-            k230.setTrackModel(0);
+            k210.setTrackModel(0);
 
             while (true) {
                 if (carportA.getLevel(&level)) {
@@ -305,7 +305,7 @@ void keyHandler(uint8_t k_value) {
         case 0x04:
 
             /*renderToScreen = !renderToScreen;
-            k230.setRenderToScreen(renderToScreen);*/
+            k210.setRenderToScreen(renderToScreen);*/
 
             break;
     }

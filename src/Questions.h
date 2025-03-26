@@ -17,6 +17,8 @@ public:
     void questions5();
 
     void questions10();
+
+    void questions2023();
 };
 
 extern Questions questions;

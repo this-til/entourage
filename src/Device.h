@@ -610,10 +610,10 @@ struct QrMessage {
 };
 
 
-class K230 : DeviceBase {
+class K210 : DeviceBase {
 public:
 
-    explicit K230(uint8_t id);
+    explicit K210(uint8_t id);
 
 
     int8_t getCameraSteeringGearAngleCache();
@@ -685,7 +685,7 @@ private:
     bool receiveTrack;
     int8_t cameraSteeringGearAngle{};
 
-
+    unsigned long lastAcquisitionTime;
 };
 
 struct TrackRowResult {
@@ -723,10 +723,19 @@ public:
      */
     uint16_t getTrackLamp();
 
-/***
- * 直行到下一个路口
- * @param carSpeed
- */
+    /***
+     * 寻迹前进
+     */
+    void trackAdvance(uint16_t speed, uint16_t distance);
+
+    void trackAdvance(uint16_t distance);
+
+    /***
+    * 直行到下一个路口
+    * @param carSpeed
+    */
+    void trackAdvanceToNextJunction(uint16_t speed);
+
     void trackAdvanceToNextJunction();
 
     /***
@@ -735,15 +744,15 @@ public:
     void advanceToNextJunction();
 
     /***
+     * 倒车寻迹到下一个路口
+     */
+    void recoilToNextJunction();
+
+    /***
      * 通过特殊地形
      * 然后调用advanceToNextJunction
      */
     void overspecificRelief();
-
-    /***
-     * 倒车寻迹到下一个路口
-     */
-    void recoilToNextJunction();
 
     /***
      * 前进一段距离
@@ -753,7 +762,7 @@ public:
 
     void advance(uint16_t distance);
 
-/***
+    /***
  * 后退一定距离
  * 无寻迹
  */
@@ -769,13 +778,13 @@ public:
 
     void trackTurnRight(uint16_t speed);
 
-    void turnLeft(uint16_t speed, uint8_t angle = 90);
+    void turnLeft(uint16_t speed, uint8_t angle);
 
     void turnLeft(uint8_t angle);
 
     void turnLeft();
 
-    void turnRight(uint16_t speed, uint8_t angle = 90);
+    void turnRight(uint16_t speed, uint8_t angle);
 
     void turnRight(uint8_t angle);
 
@@ -792,7 +801,7 @@ public:
      * 另一个trimCar方法，
      * 他比trimCar更好但是需要一条垂直车的黑线
      *
-     * 感觉可以写成黑白通用的 不管了立个TODO交给学弟了
+     * 感觉可以写成黑白通用的 不管了立个TODO交给学弟了 弃用
      */
     void trimCarByLine();
 
@@ -804,21 +813,18 @@ public:
 
     /***
      * 前进式调整
-     * @param step
      */
     void advanceCorrection(uint16_t step, uint8_t maximumFrequency);
 
     /***
      * 来回式调整
      * 不太稳定-弃用
-     * @param step
      */
     void mobileCorrection(uint16_t step);
 
     bool acceptTrackFlag();
 
-
-/***
+    /***
  * led闪烁
  */
     void ledShine(int number, int wait);
@@ -1035,7 +1041,7 @@ extern UltrasonicDevice ultrasonicDevice;
 /***
  * 摄像头
  */
-extern K230 k230;
+extern K210 k210;
 
 extern NetSynchronization netSynchronization;
 
