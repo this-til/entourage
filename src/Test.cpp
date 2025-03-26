@@ -24,20 +24,19 @@ K230Test k230Test;
 
 
 void CarTest::figureEightCycle() {
-    k230.setCameraSteeringGearAngle(-50);
-    k230.setTrackModel(TRACK_MIDDLE);
+    k210.setCameraSteeringGearAngle(-50);
+    k210.setTrackModel(TRACK_MIDDLE);
     for (int i = 0; i < 100; ++i) {
         car.trackAdvanceToNextJunction();
-
         car.turnLeft();
+
         car.recoil(500);
         car.trimCar();
         //car.recoilToNextJunction();
         car.advance(50);
         car.overspecificRelief();
-
-
         car.trackAdvanceToNextJunction();
+
         car.trackTurnLeft();
         car.trackAdvanceToNextJunction();
         car.trackTurnLeft();
@@ -53,46 +52,83 @@ void CarTest::figureEightCycle() {
         car.trackAdvanceToNextJunction();
         car.trackTurnRight();
     }
-    k230.setTrackModel(0);
+    k210.setTrackModel(0);
 }
 
+void CarTest::overspecificReliefTest() {
+    k210.setCameraSteeringGearAngle(-50);
+    k210.setTrackModel(TRACK_MIDDLE);
+
+    for (int i = 0; i < 100; ++i) {
+        car.trackTurnLeft();
+        car.trimCar();
+        car.turnLeft();
+        car.recoil(600);
+        car.overspecificRelief();
+        car.trackAdvanceToNextJunction();
+
+        car.trackTurnRight();
+        car.trimCar();
+        car.turnRight();
+        car.recoil(600);
+        car.overspecificRelief();
+        car.trackAdvanceToNextJunction();
+    }
+
+
+    k210.setTrackModel(0);
+}
+
+void CarTest::turnLeftTest() {
+    k210.setCameraSteeringGearAngle(-55);
+    k210.setTrackModel(TRACK_MIDDLE);
+    car.turnLeft();
+    k210.setTrackModel(false);
+}
+
+void CarTest::trackTurnLeftTest() {
+    k210.setCameraSteeringGearAngle(-55);
+    k210.setTrackModel(TRACK_MIDDLE);
+    car.trackTurnLeft();
+    k210.setTrackModel(false);
+}
 
 void CarTest::trackAdvanceToNextJunctionTest() {
-    k230.setCameraSteeringGearAngle(-55);
-    k230.setTrackModel(TRACK_MIDDLE);
+    k210.setCameraSteeringGearAngle(-55);
+    k210.setTrackModel(TRACK_MIDDLE);
     car.trackAdvanceToNextJunction();
-    k230.setTrackModel(false);
+    k210.setTrackModel(false);
 }
 
 void CarTest::mobileCorrectionTest() {
-    k230.setCameraSteeringGearAngle(-55);
-    k230.setTrackModel(TRACK_MIDDLE);
+    k210.setCameraSteeringGearAngle(-55);
+    k210.setTrackModel(TRACK_MIDDLE);
     car.mobileCorrection(200);
-    k230.setTrackModel(false);
+    k210.setTrackModel(false);
 }
 
 void CarTest::rightCarTest() {
-    k230.setCameraSteeringGearAngle(-55);
-    k230.setTrackModel(TRACK_MIDDLE);
+    k210.setCameraSteeringGearAngle(-55);
+    k210.setTrackModel(TRACK_MIDDLE);
     car.rightCar();
-    k230.setTrackModel(false);
+    k210.setTrackModel(false);
 }
 
 void CarTest::advanceCorrectionTest() {
-    k230.setCameraSteeringGearAngle(-55);
-    k230.setTrackModel(TRACK_MIDDLE);
+    k210.setCameraSteeringGearAngle(-55);
+    k210.setTrackModel(TRACK_MIDDLE);
     car.advanceCorrection(50, 6);
-    k230.setTrackModel(false);
+    k210.setTrackModel(false);
 }
 
 K230Test::K230Test() {}
 
 
 void K230Test::qrRecognizeTest() {
-    k230.setCameraSteeringGearAngle(0);
-    k230.setTrackModel(0);
+    k210.setCameraSteeringGearAngle(0);
+    k210.setTrackModel(0);
     uint8_t c = 0;
-    k230.qrRecognize(&c, qrMessageArray, 4);
+    k210.qrRecognize(&c, qrMessageArray, QR_CACHE_LEN);
 
     Serial.print("[QR Test] QR count:");
     Serial.print(c);

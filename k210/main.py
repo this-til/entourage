@@ -6,8 +6,6 @@ from Maix import GPIO
 from fpioa_manager import fm
 from machine import PWM, UART, Timer
 
-isDebug = True
-
 # region 配置
 DATA_FRAME_HEADER = 0x55
 DATA_FRAME_TAIL = 0xBB
@@ -37,6 +35,12 @@ COLOR_TO_RBG_MAP = {
     GREEN: (0, 255, 0),
     YELLOW: (255, 255, 0),
 }
+
+CAMERA_RGB565 = 0x01
+CAMERA_RGB565_LOW_GAIN = 0x02
+
+CAMERA_GRAYSCALE = 0x03
+CAMERA_GRAYSCALE_LOW_GAIN = 0x04
 
 
 # endregion
@@ -205,6 +209,12 @@ def handleInstruction(buf):
             angle = (byte ^ 0x80) - 0x80
             angle = angle if angle < -80 else angle if angle > 20 else angle
             setCameraSteeringGearAngle(angle)
+        if buf[3] == 0x03:  # 切换摄像机状态
+            toggleCamera(buf[4])
+        if buf[3] == 0x04:  # 开启、关闭 dubug
+            setDebug(buf[4])
+        if buf[3] == 0x05:  # 开启、关闭 屏幕渲染
+            setRenderToScreen(buf[4])
     if buf[2] == 0x92:
         if buf[3] == 0x01:
             qrRecognize(primitiveImg, None)
@@ -236,48 +246,52 @@ def judgment(buf):
 
 
 # region CAMERA
-def initCameraHighRes():
-    '''
-    初始化感光芯片为高清分辨率
-    '''
 
-    # 定义全局变量
+renderToScreen = True
+
+
+def initCameraHighRes():
+    print("Camera initialized")
+    toggleCamera(CAMERA_RGB565)
+
+
+def toggleCamera(state):
+    if state < 1:
+        state = 1
+    if state > 4:
+        state = 4
+
+    if isDebug:
+        log("toggleCamera: " + str(state))
+
     lcd.init(freq=15000000)  # 初始化LCD0
     sensor.reset()  # 复位和初始化摄像头
     sensor.set_vflip(1)  # 将摄像头设置成后置方式（所见即所得）
-    sensor.set_pixformat(sensor.RGB565)  # 设置像素格式为彩色 RGB565
-    sensor.set_framesize(sensor.QVGA)  # 设置帧大小为 VGA (640x480)
-    sensor.skip_frames(time=200)  # 等待设置生效
-    print("Camera initialized")
 
+    if state == CAMERA_RGB565 or state == CAMERA_RGB565_LOW_GAIN:
+        sensor.set_pixformat(sensor.RGB565)
+    elif state == CAMERA_GRAYSCALE or state == CAMERA_GRAYSCALE_LOW_GAIN:
+        sensor.set_pixformat(sensor.GRAYSCALE)
 
-# 灰度摄像机
-def grayscaleCamera():
-    lcd.init(freq=15000000)
-    sensor.reset()
-    sensor.set_vflip(1)
-    sensor.set_pixformat(sensor.GRAYSCALE)
+    if state == CAMERA_GRAYSCALE_LOW_GAIN or state == CAMERA_RGB565_LOW_GAIN:
+        sensor.set_auto_gain(False)
+        sensor.set_auto_whitebal(False)
+
     sensor.set_framesize(sensor.QVGA)
-    # sensor.set_auto_gain(False)
-    # sensor.set_auto_whitebal(False, gain_db=16)
-    sensor.skip_frames(time=200)
-    print("Camera initialized")
-
-
-def initRgb():
-    '''
-    初始化感光芯片
-    '''
-    lcd.init(freq=15000000)  # 初始化LCD
-    sensor.reset()  # 复位和初始化摄像头
-    sensor.set_vflip(1)  # 将摄像头设置成后置方式（所见即所得）
-    sensor.set_pixformat(sensor.RGB565)  # 设置像素格式为彩色 RGB565
-    sensor.set_framesize(sensor.QVGA)  # 设置帧大小为 QVGA (320x240)
-    sensor.set_auto_gain(False)
-    sensor.set_auto_whitebal(False)
-    # sensor.set_auto_gain(0,0)
     sensor.skip_frames(time=200)  # 等待设置生效
-    print("Camera initialized")
+    if isDebug:
+        log("toggleCamera end")
+    pass
+
+
+def setRenderToScreen(state):
+    open = True if state == 0x01 else False
+    global renderToScreen
+    renderToScreen = open
+
+    if not renderToScreen:
+        lcd.clear()
+    pass
 
 
 # endregion
@@ -289,6 +303,7 @@ def setCameraSteeringGearAngle(angle):
     设置摄像头舵机角度
     @param angle 角度 舵机角度，范围-80至+40，0度垂直于车身
     '''
+
     if isDebug:
         log("setCameraSteeringGearAngle:" + str(angle))
     steeringEngine.duty((angle + 90) / 180 * 10 + 2.5)
@@ -312,7 +327,7 @@ TRACK_HIGH = 1 << 2
 # IMG_WIDTH = 240
 # IMG_HEIGHT = 320
 
-# trackFlagBitHigh = 0
+#  trackFlagBitHigh = 0
 # trackFlagBitLow = 0
 
 # 高位区域数组，位于图像上侧
@@ -655,6 +670,7 @@ def trafficLightRecognize(img, outImg=None, sendRecognize=True):
 
 # endregion
 
+
 # region PING
 def pinged():
     buf = [
@@ -672,12 +688,15 @@ def pinged():
 
 # endregion
 
+
 # region LOG
 LOG_MAX_LINES = 13  # 最大显示行数
 FONT_SIZE = 16  # 推荐12/16/24
 LINE_HEIGHT = FONT_SIZE + 2  # 行高
 
 log_lines = []
+
+isDebug = False
 
 
 def log(msg):
@@ -700,7 +719,17 @@ def drawLogs(img):
         pass
 
 
+def setDebug(byte):
+    open = True if byte == 0x01 else False
+    global isDebug
+    isDebug = open
+    if not open:
+        log_lines.clear()
+    pass
+
+
 # endregion
+
 
 # def logicalThread():
 #    while True:
@@ -735,10 +764,11 @@ if __name__ == '__main__':
             if openTrack != 0:
                 track(primitiveImg, img, True)
 
-            # drawLogs(img)
+            if isDebug:
+                drawLogs(img)
 
             # qrRecognize()
-
-            lcd.display(img)
+            if renderToScreen:
+                lcd.display(img)
         except Exception as err:
             log("unknown err:" + str(err))

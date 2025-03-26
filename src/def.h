@@ -4,6 +4,9 @@
 
 
 #define DE_BUG false
+
+#define FLASHEND 0x3FFFF
+
 /*
 #define LOG_LEVEL 4  // 0=OFF,1=ERROR,2=WARN,3=INFO,4=DEBUG
 
@@ -31,6 +34,7 @@
 #include <Arduino.h>
 #include "Ultrasonic.h"
 #include "SCoop.h"
+#include "WString.h"
 
 #include "2021_Arduino_Demo.h"
 #include "Device.h"
@@ -38,6 +42,7 @@
 #include "Enum.h"
 #include "Test.h"
 #include "Cache.h"
+#include "Questions.h"
 
 // 标准无符号类型
 #define uchar  unsigned char
@@ -57,7 +62,9 @@
 
 #define DATA_FRAME_HEADER 0x55
 #define DATA_FRAME_TAIL 0xBB
+
 #define BUS_BASE_ADD 0x6008
+#define BUD_K210_RECEIVE 0x6038
 
 #endif //ENTOURAGE_CLION_DEF_H
 

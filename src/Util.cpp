@@ -153,7 +153,6 @@ bool equals(uint16_t* a, uint16_t* b, uint8_t len) {
     return true;
 }
 
-
 TrafficLightModel k230ColorToTrafficLightModel(K210Color k210Color) {
     switch (k210Color) {
         case K_RED :
@@ -167,24 +166,66 @@ TrafficLightModel k230ColorToTrafficLightModel(K210Color k210Color) {
 }
 
 uint32_t countBits(const uint8_t* value, uint32_t len) {
-    uint32_t count = 0;
-    for (uint32_t i = 0; i < len; ++i) {
-        for (uint8_t ii = 0; ii < 8; ii++) {
-            if (value[i] & (1 << ii)) {
-                count++;
-            }
-        }
+    //return countBits(value, len, 0, len * 8);
+
+    uint32_t add = 0;
+    for (int i = 0; i < len; ++i) {
+        add += bitCounts[value[i]];
     }
-    return count;
+    return add;
 }
 
 uint32_t countBits(const uint8_t* value, uint32_t len, uint32_t starting, uint32_t end) {
-    uint32_t count = 0;
+    /*uint32_t count = 0;
     for (uint32_t i = starting; i < end; ++i) {
         if (getBit(value, len, (int32_t) i, true)) {
             count++;
         }
     }
+    return count;*/
+
+    if (starting >= end || end > len * 8) {
+        return 0;
+    }
+
+    uint32_t start_byte = starting / 8;
+    uint32_t end_byte = (end - 1) / 8;
+
+    if (start_byte >= len || end_byte >= len) {
+        return 0;
+    }
+
+    // Convert to bit positions within the byte (0 is the highest bit, 7 is the lowest)
+    uint32_t s_bit = 7 - (starting % 8);
+    uint32_t e_bit = 7 - ((end - 1) % 8);
+
+    uint32_t count = 0;
+
+    if (start_byte == end_byte) {
+        // Handle single byte
+        if (s_bit >= e_bit) {
+            uint32_t mask_bits = s_bit - e_bit + 1;
+            uint8_t mask = ((1 << mask_bits) - 1) << e_bit;
+            count += bitCounts[value[start_byte] & mask];
+        }
+    } else {
+        // Process start byte
+        uint32_t mask_bits = s_bit + 1;
+        uint8_t mask = (1 << mask_bits) - 1;
+        count += bitCounts[value[start_byte] & mask];
+
+        // Process full bytes between start and end
+        for (uint32_t i = start_byte + 1; i < end_byte; ++i) {
+            count += bitCounts[value[i]];
+        }
+
+        // Process end byte
+        mask_bits = 7 - e_bit + 1;
+        mask = ((1 << mask_bits) - 1) << e_bit;
+        count += bitCounts[value[end_byte] & mask];
+    }
+
+
     return count;
 }
 
@@ -203,9 +244,8 @@ uint16_t unpack(Pos pos) {
     return pos.x << 8 | pos.y;
 }
 
-
 uint8_t getBit(const uint8_t* value, uint32_t len, int32_t bit, bool fromLeftToRight) {
-    if (bit < 0 || bit >= len * 8) {
+/*    if (bit < 0 || bit >= len * 8) {
         return false;
     }
 
@@ -213,7 +253,12 @@ uint8_t getBit(const uint8_t* value, uint32_t len, int32_t bit, bool fromLeftToR
         return (value[bit / 8] >> (7 - (bit % 8))) & 0x01;
     } else {
         return value[len - (bit / 8) - 1] >> (bit % 8) & 0x01;
-    }
+    }*/
+    if (bit < 0 || bit >= len * 8) return 0;
+    // 位运算替代除模运算，消除分支
+    const uint32_t byteIdx = fromLeftToRight ? (bit >> 3) : (len - (bit >> 3) - 1);
+    const uint8_t bitOffset = fromLeftToRight ? (7 - (bit & 7)) : (bit & 7);
+    return (value[byteIdx] >> bitOffset) & 0x01;
 }
 
 void setBit(uint8_t* value, uint32_t len, int32_t bit, bool set, bool fromLeftToRight) {
@@ -266,46 +311,94 @@ void lonelinessExclusion(uint8_t* value, uint32_t len, uint8_t* outValue) {
 
 }
 
-float centralPoint(uint8_t* value, uint32_t len, float* centerShift, float* centerShiftOne) {
-    uint32_t mLen = len * 8;
-    float startingPoint = -1;
-    float endPoint = -1;
 
-    for (int32_t i = 0; i < mLen; ++i) {
-        bool bit = getBit(value, len, i, true);
-        if (bit) {
-            startingPoint = (float) i;
+float centralPoint(uint8_t* value, uint32_t len, float* centerShift, float* centerShiftOne) {
+    /* uint32_t mLen = len * 8;
+     float startingPoint = -1;
+     float endPoint = -1;
+
+     for (int32_t i = 0; i < mLen; ++i) {
+         bool bit = getBit(value, len, i, true);
+         if (bit) {
+             startingPoint = (float) i;
+             break;
+         }
+     }
+
+     if (startingPoint == -1) {
+         if (centerShift != nullptr) {
+             *centerShift = 0;
+         }
+         if (centerShiftOne != nullptr) {
+             *centerShiftOne = 0;
+         }
+         return 0;
+     }
+
+     for (int32_t i = 0; i < mLen; ++i) {
+         bool bit = getBit(value, len, i, false);
+         if (bit) {
+             endPoint = (float) (mLen - i - 1);
+             break;
+         }
+     }
+
+     float centralPoint = startingPoint + ((endPoint - startingPoint) / 2);
+     centralPoint += 0.5;
+     float _centerShift = centralPoint - (float) mLen / 2;
+     if (centerShift != nullptr) {
+         *centerShift = _centerShift;
+     }
+     if (centerShiftOne != nullptr) {
+         *centerShiftOne = _centerShift / ((float) mLen / 2 - 0.5f);
+     }
+     return centralPoint;*/
+
+    const uint32_t mLen = len * 8;
+    int16_t startingPoint = -1;
+    int16_t endPoint = -1;
+
+    // Find the first set bit from left to right (startingPoint)
+    for (uint32_t byte_idx = 0; byte_idx < len; ++byte_idx) {
+        const uint8_t byte_val = value[byte_idx];
+        if (byte_val != 0) {
+            const int highest_bit = highestBitTable[byte_val];
+            startingPoint = byte_idx * 8 + (7 - highest_bit);
             break;
         }
     }
 
-    if (startingPoint == -1) {
-        if (centerShift != nullptr) {
-            *centerShift = 0;
+    if (startingPoint < 0) { // All bits are zero
+        if (centerShift) {
+            *centerShift = 0.0f;
         }
-        if (centerShiftOne != nullptr) {
-            *centerShiftOne = 0;
+        if (centerShiftOne) {
+            *centerShiftOne = 0.0f;
         }
         return -1;
     }
 
-    for (int32_t i = 0; i < mLen; ++i) {
-        bool bit = getBit(value, len, i, false);
-        if (bit) {
-            endPoint = (float) (mLen - i - 1);
+    // Find the first set bit from right to left (endPoint)
+    for (int32_t byte_idx = len - 1; byte_idx >= 0; --byte_idx) {
+        const uint8_t byte_val = value[byte_idx];
+        if (byte_val != 0) {
+            const int lowest_bit = lowestBitTable[byte_val];
+            endPoint = byte_idx * 8 + (7 - lowest_bit);
             break;
         }
     }
 
-    float centralPoint = startingPoint + ((endPoint - startingPoint) / 2);
-    centralPoint += 0.5;
-    float _centerShift = centralPoint - (float) mLen / 2;
-    if (centerShift != nullptr) {
+    const float centralPoint = startingPoint + (endPoint - startingPoint) * 0.5f + 0.5f;
+    const float _centerShift = centralPoint - static_cast<float>(mLen) * 0.5f;
+
+    if (centerShift) {
         *centerShift = _centerShift;
     }
-    if (centerShiftOne != nullptr) {
-        *centerShiftOne = _centerShift / ((float) mLen / 2 - 0.5f);
+    if (centerShiftOne) {
+        const float scale = static_cast<float>(mLen) * 0.5f - 0.5f;
+        *centerShiftOne = _centerShift / scale;
     }
+
     return centralPoint;
 }
 
@@ -340,24 +433,164 @@ void analyze(uint16_t* array, uint8_t maxArrayLen, char* outStr, uint8_t maxStrL
     outStr[outIndex] = '\0';
 }
 
-void excludeSpecialCharacter(const uint8_t* source, uint8_t sourceLen, uint8_t* out, uint8_t outLen, uint8_t* specialNumber) {
+void excludeSpecialCharacter(const uint8_t* source, uint16_t sourceLen, uint8_t* out, uint16_t outMaxLen, uint16_t* outLen) {
     uint8_t outIndex = 0;
     for (uint8_t i = 0; i < sourceLen; ++i) {
         uint8_t c = source[i];
         if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
-            if (outIndex < outLen) {
-                out[outIndex++] = c;
-            } else {
+            out[outIndex] = c;
+            outIndex++;
+            if (outIndex >= outMaxLen) {
                 break;
             }
         }
     }
-    if (specialNumber != nullptr) {
-        *specialNumber = sourceLen - outIndex;
+    if (outLen != nullptr) {
+        *outLen = outIndex;
     }
 }
 
-#define MAX_STACK_SIZE 32
+void excludeCharacter(const uint8_t* source, uint16_t sourceLen, uint8_t* out, uint16_t outMaxLen, uint16_t* outLen, uint8_t* matchingItem) {
+
+    uint8_t outIndex = 0;
+    for (uint8_t i = 0; i < sourceLen; ++i) {
+        uint8_t c = source[i];
+        if (matchingItem[c]) {
+            continue;
+        }
+        out[outIndex] = c;
+        outIndex++;
+        if (outIndex >= outMaxLen) {
+            break;
+        }
+    }
+
+    if (outLen != nullptr) {
+        *outLen = outIndex;
+    }
+
+}
+
+void extractCharacter(const uint8_t* str, uint16_t strLen, uint8_t* outStr, uint16_t maxLen, uint16_t* outLen, uint8_t up, uint8_t down, bool inRadius) {
+    uint16_t l = 0;
+    bool _inRadius = false;
+    for (int i = 0; i < strLen; ++i) {
+        if (str[i] == up && !_inRadius) {
+            _inRadius = true;
+            continue;
+        }
+
+        if (str[i] == down && _inRadius) {
+            _inRadius = false;
+            if (inRadius) {
+                break;
+            }
+            continue;
+        }
+
+        if (inRadius == _inRadius) {
+            outStr[l++] = str[i];
+            if (l >= maxLen) {
+                break;
+            }
+        }
+    }
+
+    if (outLen != nullptr) {
+        *outLen = l;
+    }
+}
+
+bool inclusiveCharacter(const uint8_t* str, uint16_t strLen, uint8_t* matchingEntry, uint16_t matchingEntryLen, uint16_t* preferredMatch) {
+    // 边界条件检查：匹配项为空或源字符串长度不足
+    if (matchingEntryLen == 0 || strLen < matchingEntryLen) {
+        return false;
+    }
+
+    // 计算最大需要检查的起始位置
+    const uint16_t maxStartPos = strLen - matchingEntryLen;
+
+    // 遍历所有可能的起始位置
+    for (uint16_t i = 0; i <= maxStartPos; i++) {
+        // 检查当前位置是否匹配
+        bool isMatch = true;
+        for (uint16_t j = 0; j < matchingEntryLen; j++) {
+            if (str[i + j] != matchingEntry[j]) {
+                isMatch = false;
+                break;
+            }
+        }
+
+        // 找到匹配时设置偏移量并返回
+        if (isMatch) {
+            if (preferredMatch != nullptr) {
+                *preferredMatch = i;
+            }
+            return true;
+        }
+    }
+
+    // 未找到匹配项
+    return false;
+}
+
+
+void spotTheDifference(const uint8_t* strA, const uint8_t* strB, uint16_t strLen, uint8_t* out, uint16_t maxOutLen, uint16_t* countOfDifferentTerms) {
+    if (maxOutLen % 2 == 1) {
+        maxOutLen--;
+    }
+    int maxItem = maxOutLen / 2;
+    int item = 0;
+    for (int i = 0; i < strLen; ++i) {
+        if (strA[i] != strB[i]) {
+
+            out[item] = strA[i];
+            out[maxOutLen - item - 1] = strB[i];
+
+            item++;
+            if (item >= maxItem) {
+                break;
+            }
+
+        }
+    }
+    if (countOfDifferentTerms != nullptr) {
+        *countOfDifferentTerms = item;
+    }
+}
+
+void asciiToHex(const uint8_t* str, uint16_t strLen, uint8_t* out, uint16_t maxOutLen, uint16_t* outLen) {
+    uint16_t len = 0;
+    for (uint16_t i = 0; i + 1 < strLen && len < maxOutLen; i += 2) {
+        // 处理高四位字符
+        uint8_t high = str[i];
+        uint8_t highVal = 0;
+        if (high >= '0' && high <= '9') {
+            highVal = high - '0';
+        } else if (high >= 'A' && high <= 'F') {
+            highVal = 10 + (high - 'A');
+        } else if (high >= 'a' && high <= 'f') {
+            highVal = 10 + (high - 'a');
+        }
+
+        // 处理低四位字符
+        uint8_t low = str[i + 1];
+        uint8_t lowVal = 0;
+        if (low >= '0' && low <= '9') {
+            lowVal = low - '0';
+        } else if (low >= 'A' && low <= 'F') {
+            lowVal = 10 + (low - 'A');
+        } else if (low >= 'a' && low <= 'f') {
+            lowVal = 10 + (low - 'a');
+        }
+
+        // 合并高低四位并存入输出缓冲区
+        out[len++] = (highVal << 4) | lowVal;
+    }
+    *outLen = len; // 设置实际转换后的数据长度
+}
+
+#define MAX_STACK_SIZE 8
 
 typedef struct {
     int16_t data[MAX_STACK_SIZE];
@@ -442,7 +675,6 @@ static void apply_op(uint8_t op, OperandStack* os) {
     push_operand(os, res);
 }
 
-/* 主函数 */
 int16_t evaluateTheExpression(const uint8_t* expr, uint16_t var[]) {
     OperandStack op_stack;
     OperatorStack oper_stack;
@@ -479,10 +711,9 @@ int16_t evaluateTheExpression(const uint8_t* expr, uint16_t var[]) {
     }
 
     // 处理剩余运算符
-    while (oper_stack.top != -1)
+    while (oper_stack.top != -1) {
         apply_op(pop_operator(&oper_stack), &op_stack);
+    }
 
     return pop_operand(&op_stack);
 }
-
-

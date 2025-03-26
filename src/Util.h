@@ -29,11 +29,11 @@ bool equals(uint16_t* a, uint16_t* b, uint8_t len);
 uint32_t countBits(const uint8_t* value, uint32_t len);
 
 /***
- *
+ * 求value中1的数量
  * @param value
  * @param len
- * @param starting  ~ [starting, end)
- * @param end       ~
+ * @param starting  ~ [0, len * 8) 开始的bit索引位置
+ * @param end       ~ (0, len * 8] 结束的bit索引+1的位置
  * @return
  */
 uint32_t countBits(const uint8_t* value, uint32_t len, uint32_t starting, uint32_t end);
@@ -115,7 +115,54 @@ void assembly(const char* str, uint16_t* outArray, uint8_t maxArrayLen);
 /***
  * 排除source中的特殊字符，并且输出到out
  */
-void excludeSpecialCharacter(const uint8_t* source, uint8_t sourceLen, uint8_t* out, uint8_t outLen, uint8_t* specialNumber = nullptr);
+void excludeSpecialCharacter(const uint8_t* source, uint16_t sourceLen, uint8_t* out, uint16_t outMaxLen, uint16_t* outLen);
+
+/***
+ * 通过matchingItem排除特定字符
+ * @param matchingItem len = 256 Map<uint8_t, bool> if v true 将排除
+ */
+void excludeCharacter(const uint8_t* source, uint16_t sourceLen, uint8_t* out, uint16_t outMaxLen, uint16_t* outLen, uint8_t* matchingItem);
+
+/***
+ * 提取指定up、down中间或者外面的数据
+ */
+void extractCharacter(const uint8_t* str, uint16_t strLen, uint8_t* outStr, uint16_t maxLen, uint16_t* outLen, uint8_t up = '<', uint8_t down = '>', bool inRadius = true);
+
+/***
+ * 深度提取字符
+ * 
+ */
+void profundityExtractCharacter(const uint8_t* str, uint16_t strLen, uint8_t* outStr, uint16_t maxLen, uint16_t* outLen, uint8_t up = '<', uint8_t down = '>', bool inRadius = true);
+
+/***
+ * 匹配特定字符
+ * @param str 源
+ * @param strLen 源长度
+ * @param matchingEntry 匹配项
+ * @param matchingEntryLen 匹配项长度
+ * @param preferredMatch 第一个匹配成功的字符索引
+ * @return
+ */
+bool inclusiveCharacter(const uint8_t* str, uint16_t strLen, uint8_t* matchingEntry, uint16_t matchingEntryLen, uint16_t* preferredMatch = nullptr);
+
+/***
+ * 找不同
+ * 2023国赛二维码字符处理
+ * 二维码（1）信息 A1B2C3D4E5F6
+ * 二维码（2）信息 A1B2D1D4E5F7
+ * 按位比对 2 个二维码中的有效数据，提取出不同数据，以二维码（1）中与二
+ * 维码（2）中不同数据在前，二维码（2）与二维码（1）中不同数据在后为原则，
+ * 得到 C，3，6，D，1，7 数据
+ *
+ * @param out len为偶数，不然将会舍弃最后一位
+ */
+void spotTheDifference(const uint8_t* strA, const uint8_t* strB, uint16_t strLen, uint8_t* out, uint16_t maxOutLen, uint16_t* countOfDifferentTerms = nullptr);
+
+/***
+ * 将两位ascii字符(0~F)组成一位16进制的字符
+ */
+void asciiToHex(const uint8_t* str, uint16_t strLen, uint8_t* out, uint16_t maxOutLen, uint16_t* outLen);
+
 
 /***
  * 表达式求值
@@ -123,6 +170,8 @@ void excludeSpecialCharacter(const uint8_t* source, uint8_t sourceLen, uint8_t* 
  * @param variable 长度为256的数组 使用variable['n']获取变量
  * @return
  */
-int16_t evaluateTheExpression(const uint8_t* expression, uint16_t variable[]);
+int16_t
+
+evaluateTheExpression(const uint8_t* expression, uint16_t variable[]);
 
 #endif //ENTOURAGE_CLION_UTIL_H

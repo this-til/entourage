@@ -69,6 +69,8 @@ enum K210Color {
     K_RED = 0x03,
     K_GREEN = 0x04,
     K_YELLOW = 0x05,
+    //TODO 未实现
+    K_BLUE = 0x06,
 };
 
 enum PageTurningMode {
@@ -238,6 +240,13 @@ enum Direction {
      */
     D_RIGHT = 0x04,
 
+};
+
+enum CameraState {
+    CAMERA_RGB565 = 0x01,
+    CAMERA_RGB565_LOW_GAIN = 0x02,
+    CAMERA_GRAYSCALE = 0x03,
+    CAMERA_GRAYSCALE_LOW_GAIN = 0x04,
 };
 
 #endif //ENTOURAGE_CLION_ENUM_H

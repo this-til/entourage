@@ -8,10 +8,22 @@
 //哄老母鸡被迫留下来的痔疮代码
 #define FOR_THE_KING_HEN true
 
-#define DETECTED_VALUE_CHANGE(name)                                                                                     \
+
+#define SEND(buf, len) SEND_ALL(buf, len , 0x6008, true, 300)
+
+#define SEND_ALL(buf, len, bus, verify, sendCoolingMs)                                                                  \
+messageBus.send(buf, len, bus, verify);                                                                                 \
+sleep(sendCoolingMs);                                                                                                   \
+
+#define DETECTED_VALUE_CHANGE(name) SEND_AND_DETECTED_VALUE_CHANGE(;, name)
+#define TWO_DETECTED_VALUE_CHANGE(name1, name2) TWO_SEND_AND_DETECTED_VALUE_CHANGE(;,name1, name2)
+#define THERE_DETECTED_VALUE_CHANGE(name1, name2, name3) THERE_SEND_AND_DETECTED_VALUE_CHANGE(;,name1, name2, name3)
+
+#define SEND_AND_DETECTED_VALUE_CHANGE(send, name)                                                                      \
 unsigned long startTime = millis();                                                                                     \
 uint8_t name##Version = this->name##Version;                                                                            \
 while (millis() - startTime < 1000) {                                                                                   \
+    send                                                                                                                \
     if(name##Version != this->name##Version) {                                                                          \
         if ((name) != nullptr) {                                                                                        \
             *(name) = this->name;                                                                                       \
@@ -22,10 +34,12 @@ while (millis() - startTime < 1000) {                                           
 }                                                                                                                       \
 return false;                                                                                                           \
 
-#define TWO_DETECTED_VALUE_CHANGE(name1, name2)                                                                         \
+
+#define TWO_SEND_AND_DETECTED_VALUE_CHANGE(send, name1, name2)                                                          \
 unsigned long startTime = millis();                                                                                     \
 uint8_t name1##_##name2##Version = this->name1##_##name2##Version;                                                      \
 while (millis() - startTime < 1000) {                                                                                   \
+    send                                                                                                                \
     if(name1##_##name2##Version != this->name1##_##name2##Version) {                                                    \
         if ((name1) != nullptr) {                                                                                       \
             *(name1) = this->name1;                                                                                     \
@@ -39,11 +53,12 @@ while (millis() - startTime < 1000) {                                           
 }                                                                                                                       \
 return false;                                                                                                           \
 
-#define THERE_DETECTED_VALUE_CHANGE(name1, name2, name3)                                                                \
+#define THERE_SEND_AND_DETECTED_VALUE_CHANGE(send, name1, name2, name3)                                                 \
 unsigned long startTime = millis();                                                                                     \
     uint8_t name1##_##name2##_##name3##Version = this->name1##_##name2##_##name3##Version;                              \
     while (millis() - startTime < 1000) {                                                                               \
     if(name1##_##name2##_##name3##Version != this->name1##_##name2##_##name3##Version) {                                \
+        send                                                                                                            \
         if ((name1) != nullptr) {                                                                                       \
             *(name1) = this->name1;                                                                                     \
         }                                                                                                               \
@@ -215,6 +230,8 @@ public:
      * "智能道闸标志物处于关闭状态时请求回传状态，不会回传任何指令。"
      */
     bool getGateControl();
+
+    void onReceiveZigbeeMessage(uint8_t* buf) override;
 
 };
 
@@ -593,10 +610,10 @@ struct QrMessage {
 };
 
 
-class K230 : DeviceBase {
+class K210 : DeviceBase {
 public:
 
-    explicit K230(uint8_t id);
+    explicit K210(uint8_t id);
 
 
     int8_t getCameraSteeringGearAngleCache();
@@ -615,6 +632,12 @@ public:
     void setTrackModel(const TrackModel trackModel[], uint8_t len);
 
     uint8_t getTrackModelCache();
+
+    void setCameraState(enum CameraState cameraState);
+
+    void setDebug(bool open);
+
+    void setRenderToScreen(bool open);
 
     /***
      * 获取寻迹标志位
@@ -655,10 +678,14 @@ public:
 
     //void loop();
 
+    void clearSerialPort();
+
 private:
     uint8_t trackModel{};
     bool receiveTrack;
     int8_t cameraSteeringGearAngle{};
+
+    unsigned long lastAcquisitionTime;
 };
 
 struct TrackRowResult {
@@ -696,10 +723,19 @@ public:
      */
     uint16_t getTrackLamp();
 
-/***
- * 直行到下一个路口
- * @param carSpeed
- */
+    /***
+     * 寻迹前进
+     */
+    void trackAdvance(uint16_t speed, uint16_t distance);
+
+    void trackAdvance(uint16_t distance);
+
+    /***
+    * 直行到下一个路口
+    * @param carSpeed
+    */
+    void trackAdvanceToNextJunction(uint16_t speed);
+
     void trackAdvanceToNextJunction();
 
     /***
@@ -708,35 +744,51 @@ public:
     void advanceToNextJunction();
 
     /***
+     * 倒车寻迹到下一个路口
+     */
+    void recoilToNextJunction();
+
+    /***
      * 通过特殊地形
      * 然后调用advanceToNextJunction
      */
     void overspecificRelief();
 
     /***
-     * 倒车寻迹到下一个路口
-     */
-    void recoilToNextJunction();
-
-    /***
      * 前进一段距离
      * 无寻迹
      */
+    void advance(int16_t speed, uint16_t distance);
+
     void advance(uint16_t distance);
 
-/***
+    /***
  * 后退一定距离
  * 无寻迹
  */
+    void recoil(uint16_t speed, uint16_t distance);
+
     void recoil(uint16_t distance);
 
     void trackTurnLeft();
 
+    void trackTurnLeft(uint16_t speed);
+
     void trackTurnRight();
 
-    void turnLeft(uint8_t angle = 90);
+    void trackTurnRight(uint16_t speed);
 
-    void turnRight(uint8_t angle = 90);
+    void turnLeft(uint16_t speed, uint8_t angle);
+
+    void turnLeft(uint8_t angle);
+
+    void turnLeft();
+
+    void turnRight(uint16_t speed, uint8_t angle);
+
+    void turnRight(uint8_t angle);
+
+    void turnRight();
 
     /***
      * 微调车姿态
@@ -746,26 +798,33 @@ public:
     void trimCar(TrackRowResult* trackRowResult, float offset);
 
     /***
+     * 另一个trimCar方法，
+     * 他比trimCar更好但是需要一条垂直车的黑线
+     *
+     * 感觉可以写成黑白通用的 不管了立个TODO交给学弟了 弃用
+     */
+    void trimCarByLine();
+
+    /***
      * 矫正车身，与寻迹线平行
+     * 不太稳定-弃用
      */
     void rightCar();
 
     /***
      * 前进式调整
-     * @param step
      */
     void advanceCorrection(uint16_t step, uint8_t maximumFrequency);
 
     /***
      * 来回式调整
-     * @param step
+     * 不太稳定-弃用
      */
     void mobileCorrection(uint16_t step);
 
     bool acceptTrackFlag();
 
-
-/***
+    /***
  * led闪烁
  */
     void ledShine(int number, int wait);
@@ -814,8 +873,7 @@ public:
      */
     uint16_t globalVariable[256] = {};
     uint8_t globalVariableVersion[256] = {};
-
-    uint8_t globalVariableReturnCount = 0;
+    uint8_t globalVariableReturnCount[256] = {};
 
     /***
     * 自动同步一个全局数据
@@ -983,7 +1041,7 @@ extern UltrasonicDevice ultrasonicDevice;
 /***
  * 摄像头
  */
-extern K230 k230;
+extern K210 k210;
 
 extern NetSynchronization netSynchronization;
 

@@ -137,6 +137,7 @@ bool MessageBus::awaitReturn(uint8_t* buf, uint8_t len, uint8_t id, const uint8_
             continue;
         }
         ExtSRAMInterface.ExMem_Read_Bytes(bus, buf, len);
+
 #if DE_BUG
         Serial.print("[DEBUG] read:");
         logHex(buf, len);
@@ -157,18 +158,74 @@ bool MessageBus::awaitReturn(uint8_t* buf, uint8_t len, uint8_t id, uint8_t serv
 }
 
 bool MessageBus::sendAndWait(uint8_t* buf, uint8_t len, const uint8_t* returnCount, uint16_t bus, bool addVerify, unsigned long sendCoolingMs, unsigned long maxWaitingTimeMs) {
+#if DE_BUG
+    Serial.println("[DEBUG] sendAndWait...");
+#endif
+    uint8_t counter = 0;
     const uint8_t initialCount = *returnCount;
     const unsigned long startTime = millis();
-    while (millis() - startTime < 5000) {
+    while (millis() - startTime < maxWaitingTimeMs) {
+        counter++;
+#if DE_BUG
+        Serial.print("[DEBUG] sendAndWait send counter:");
+        Serial.print(counter);
+        Serial.println();
+#endif
         send(buf, len, bus, addVerify, sendCoolingMs);
         sleep(sendCoolingMs);
         if (initialCount != *returnCount) {
+#if DE_BUG
+            Serial.println("[DEBUG] sendAndWait successful");
+#endif
             return true;
         }
     }
+#if DE_BUG
+    Serial.println("[WARN] sendAndWait outTime...");
+#endif
     return false;
 }
 
+/*bool MessageBus::sendAndWait(uint8_t* buf, uint8_t len, uint8_t* backBuf, uint8_t id, const uint8_t* serviceId, uint8_t serviceLen, uint16_t bus, bool verify, unsigned long readOutTimeMs) {
+    const unsigned long startTime = millis();
+#if DE_BUG
+    Serial.println("[DEBUG] sendAndWait...");
+#endif
+    uint8_t counter = 0;
+    while (millis() - startTime < readOutTimeMs) {
+        counter++;
+#if DE_BUG
+        Serial.print("[DEBUG] sendAndWait send counter:");
+        Serial.print(counter);
+        Serial.println();
+#endif
+        send(buf, len, verify);
+        if (ExtSRAMInterface.ExMem_Read(bus) == 0x00) {
+            continue;
+        }
+        ExtSRAMInterface.ExMem_Read_Bytes(bus, buf, len);
+#if DE_BUG
+        Serial.print("[DEBUG] read:");
+        logHex(buf, len);
+#endif
+        if (check(buf, len, id, serviceId, serviceLen, verify)) {
+#if DE_BUG
+            Serial.println("[DEBUG] sendAndWait successful");
+#endif
+            return true;
+        }
+        yield();
+    }
+#if DE_BUG
+    Serial.println("[WARN] sendAndWait outTime...");
+#endif
+    return false;
+
+}
+
+bool MessageBus::sendAndWait(uint8_t* buf, uint8_t len, uint8_t* backBuf, uint8_t id, uint8_t serviceId, uint16_t bus, bool verify, unsigned long readOutTimeMs) {
+    return sendAndWait(buf, len, backBuf, id, &serviceId, 1, bus, verify, readOutTimeMs);
+}*/
 
 DeviceBase::DeviceBase(uint8_t id) {
     this->id = id;
@@ -192,12 +249,9 @@ void AlarmDesk::openByInfrared(uint8_t* openCode) {
 /***
    * 获取救援位置
    */
-
 bool AlarmDesk::getRescuePosition(uint8_t* rescuePosition) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x09, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    messageBus.send(buf, 8);
-
-    DETECTED_VALUE_CHANGE(rescuePosition)
+    SEND_AND_DETECTED_VALUE_CHANGE(SEND(buf, 8), rescuePosition)
 }
 
 /***
@@ -206,15 +260,20 @@ bool AlarmDesk::getRescuePosition(uint8_t* rescuePosition) {
  * @param data[] len=6
  */
 void AlarmDesk::setOpenCode(uint8_t* data) {
-    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x10, data[5], data[4], data[3], 0x00, DATA_FRAME_TAIL};
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x10, data[0], data[1], data[2], 0x00, DATA_FRAME_TAIL};
     messageBus.send(buf, 8);
 
-    uint8_t buf2[] = {DATA_FRAME_HEADER, id, 0x11, data[2], data[1], data[0], 0x00, DATA_FRAME_TAIL};
-    messageBus.send(buf, 8);
+    uint8_t buf2[] = {DATA_FRAME_HEADER, id, 0x11, data[3], data[4], data[5], 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf2, 8);
 }
 
 
 BarrierGate::BarrierGate(uint8_t id) : DeviceBase(id) {
+}
+
+void BarrierGate::onReceiveZigbeeMessage(uint8_t* buf) {
+    DeviceBase::onReceiveZigbeeMessage(buf);
+    UPDATE_VALUE(buf[2] == 0x01 && buf[4] == 0x05, gateControl, false)
 }
 
 void BarrierGate::setGateControl(bool open) {
@@ -237,10 +296,8 @@ void BarrierGate::setLicensePlateData(uint8_t* data) {
 
 bool BarrierGate::getGateControl() {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x20, 0x01, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    messageBus.send(buf, 8);
-
     bool* gateControl = nullptr;
-    DETECTED_VALUE_CHANGE(gateControl)
+    SEND_AND_DETECTED_VALUE_CHANGE(SEND(buf, 8), gateControl)
 }
 
 
@@ -276,15 +333,12 @@ void BusStop::setRtcStartTime(uint8_t HH, uint8_t mm, uint8_t ss) {
 
 bool BusStop::getRtcDate(uint8_t* yy, uint8_t* MM, uint8_t* dd) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x31, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    messageBus.send(buf, 8);
-    THERE_DETECTED_VALUE_CHANGE(yy, MM, dd)
+    THERE_SEND_AND_DETECTED_VALUE_CHANGE(SEND(buf, 8), yy, MM, dd);
 }
 
 bool BusStop::getRtcTime(uint8_t* HH, uint8_t* mm, uint8_t* ss) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x41, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    messageBus.send(buf, 8);
-    THERE_DETECTED_VALUE_CHANGE(HH, mm, ss)
-
+    THERE_SEND_AND_DETECTED_VALUE_CHANGE(SEND(buf, 8), HH, mm, ss);
 }
 
 void BusStop::setWeatherTemperature(Weather weather, uint8_t temperature) {
@@ -296,7 +350,8 @@ bool BusStop::getWeatherTemperature(Weather* weather, uint8_t* temperature) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x43, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     messageBus.send(buf, 8);
 
-    TWO_DETECTED_VALUE_CHANGE(weather, temperature);
+    TWO_SEND_AND_DETECTED_VALUE_CHANGE(SEND(buf, 8), weather, temperature)
+
     /*bool successful = awaitReturn(buf, 0x04);
     if (successful) {
         *weather = Weather(buf[3]);
@@ -347,7 +402,7 @@ void Monitor::setDisplayData(uint8_t pos, const uint8_t value[]) {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, pos, 0x00, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     buf[3] = value[0] << 8 | value[1];
     buf[4] = value[2] << 8 | value[3];
-    buf[5] = value[4] << 8 | value[4];
+    buf[5] = value[4] << 8 | value[5];
     messageBus.send(buf, 8);
 
 }
@@ -386,9 +441,7 @@ bool Carport::getLevel(uint8_t* level) {
     Serial.println("getLevel...");
 #endif
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x02, 0x01, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    messageBus.send(buf, 8);
-
-    DETECTED_VALUE_CHANGE(level)
+    SEND_AND_DETECTED_VALUE_CHANGE(SEND(buf, 8), level)
 
     /*uint8_t serviceId[] = {0x03, 0x01};
     bool successful = awaitReturn(buf, serviceId, 2);
@@ -408,8 +461,7 @@ bool Carport::getInfraredState(bool* ventral, bool* rearSide) {
     Serial.println("getInfraredState...");
 #endif
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x02, 0x02, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
-    messageBus.send(buf, 8);
-    TWO_DETECTED_VALUE_CHANGE(ventral, rearSide)
+    TWO_SEND_AND_DETECTED_VALUE_CHANGE(SEND(buf, 8), ventral, rearSide)
 
     /*uint8_t serviceId[] = {0x03, 0x02};
     bool s = awaitReturn(buf, serviceId, 2);
@@ -584,7 +636,7 @@ void StereoscopicDisplay::showTextByZigBee(const uint16_t* gbk, uint8_t len) {
 double UltrasonicDevice::ranging(int sys, int rangeFrequency, int wait) {
     double distance = 0;
     for (int i = 0; i < rangeFrequency; ++i) {
-        distance += Ultrasonic.Ranging(CM);
+        distance += Ultrasonic.Ranging(sys);
         sleep(wait);
     }
     return distance / rangeFrequency;
@@ -608,27 +660,31 @@ void UltrasonicDevice::adjustDistance(uint8_t carSeep, uint8_t targetDistance, d
     DCMotor.Stop();
 }
 
-K230::K230(uint8_t id) : DeviceBase(id) {
+K210::K210(uint8_t id) : DeviceBase(id) {
 }
 
-void K230::setTrackModel(uint8_t model) {
+void K210::setTrackModel(uint8_t model) {
 
 #if DE_BUG
     Serial.print("[DEBUG] setCameraSteeringGearAngle:");
     logBin(model);
     Serial.println();
 #endif
-    this->trackModel = model;
 
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x91, 0x01, model, 0x00, 0x00, DATA_FRAME_TAIL};
     messageBus.send(buf, 8);
+
+    if (trackModel != model) {
+        sleep(500);
+    }
+    trackModel = model;
 
     if (model) {
         getTrackFlagBit(nullptr);
     }
 }
 
-void K230::setTrackModel(const TrackModel* trackModel, uint8_t len) {
+void K210::setTrackModel(const TrackModel* trackModel, uint8_t len) {
     uint8_t model = 0;
     for (int i = 0; i < len; ++i) {
         model |= trackModel[i];
@@ -636,34 +692,59 @@ void K230::setTrackModel(const TrackModel* trackModel, uint8_t len) {
     setTrackModel(model);
 }
 
-uint8_t K230::getTrackModelCache() {
+uint8_t K210::getTrackModelCache() {
     return trackModel;
 }
 
-int8_t K230::getCameraSteeringGearAngleCache() {
+int8_t K210::getCameraSteeringGearAngleCache() {
     return cameraSteeringGearAngle;
 }
 
-void K230::setCameraSteeringGearAngle(int8_t angle) {
+void K210::setCameraSteeringGearAngle(int8_t angle) {
 
 #if DE_BUG
     Serial.print("[DEBUG] setCameraSteeringGearAngle:");
     Serial.print(angle);
     Serial.println();
 #endif
-    cameraSteeringGearAngle = angle;
+
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x91, 0x02, (uint8_t) angle, 0x00, 0x00, DATA_FRAME_TAIL};
     messageBus.send(buf, 8);
 
-    //Command.Judgment(buf);
-    //ExtSRAMInterface.ExMem_Write_Bytes(BUS_BASE_ADD, buf, 8);
-    //Serial.messageBus.send(buf, 8);
+    if (cameraSteeringGearAngle != angle) {
+        sleep(500);
+    }
+
+    cameraSteeringGearAngle = angle;
 }
 
-bool K230::getTrackFlagBit(uint8_t* result) {
+void K210::setCameraState(CameraState cameraState) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x91, 0x03, (uint8_t) cameraState, 0x00, 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
+}
+
+void K210::setDebug(bool open) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x91, 0x04, (uint8_t) open, 0x00, 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
+}
+
+void K210::setRenderToScreen(bool open) {
+    uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x91, 0x05, (uint8_t) open, 0x00, 0x00, DATA_FRAME_TAIL};
+    messageBus.send(buf, 8);
+}
+
+bool K210::getTrackFlagBit(uint8_t* result) {
+
+    if (lastAcquisitionTime - millis() > 500) {
+        clearSerialPort();
+    }
+    lastAcquisitionTime = millis();
+
     uint8_t buf[12] = {};
     uint8_t sbuf[2] = {0x091, 0x01};
-    bool successful = messageBus.awaitReturn(buf, 12, id, sbuf, 2, 0x6038);
+    bool successful = messageBus.awaitReturn(buf, 12, id, sbuf, 2, BUD_K210_RECEIVE);
+
+    clearSerialPort();
 
     if (successful) {
         if (result != nullptr) {
@@ -680,7 +761,15 @@ bool K230::getTrackFlagBit(uint8_t* result) {
     return successful;
 }
 
-bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen) {
+
+void K210::clearSerialPort() {
+    uint8_t buf = 0;
+    while (ExtSRAMInterface.ExMem_Read(BUD_K210_RECEIVE) != 0x00) {
+        ExtSRAMInterface.ExMem_Read_Bytes(BUD_K210_RECEIVE, &buf, 1);
+    }
+}
+
+bool K210::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen) {
 #if DE_BUG
     Serial.println("qrRecognize...");
 #endif
@@ -808,7 +897,7 @@ bool K230::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen
     return hitCount >= s_count;
 }
 
-bool K230::trafficLightRecognize(K210Color* k210Color) {
+bool K210::trafficLightRecognize(K210Color* k210Color) {
     receiveTrack = false;
 
 #if DE_BUG
@@ -834,7 +923,7 @@ bool K230::trafficLightRecognize(K210Color* k210Color) {
     return successful;
 }
 
-bool K230::trafficLightRecognize_rigorous(K210Color* k210Color, uint16_t consecutiveEqualDegree, uint16_t maxRetry) {
+bool K210::trafficLightRecognize_rigorous(K210Color* k210Color, uint16_t consecutiveEqualDegree, uint16_t maxRetry) {
     receiveTrack = false;
 
     K210Color currentColor = K_NONE;
@@ -905,7 +994,7 @@ bool K230::trafficLightRecognize_rigorous(K210Color* k210Color, uint16_t consecu
     return consecutiveCount >= consecutiveEqualDegree;
 }
 
-bool K230::ping() {
+bool K210::ping() {
     receiveTrack = true;
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x92, 0xFE, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     messageBus.send(buf, 8);
@@ -954,10 +1043,12 @@ void Car::onReceiveZigbeeMessage(uint8_t* buf) {
             messageBus.send(_buf, 8);
             break;
         case 0xFE: //~0x01
-            netSynchronization.globalVariableReturnCount++;
+            netSynchronization.globalVariableReturnCount[buf[3]]++;
 #if DE_BUG
             Serial.print("[DEBUG] globalVariableReturnCount:");
-            Serial.print(netSynchronization.globalVariableReturnCount);
+            Serial.print(buf[3]);
+            Serial.print(" -> ");
+            Serial.print(netSynchronization.globalVariableReturnCount[buf[3]]);
             Serial.println();
 #endif
             break;
@@ -1002,20 +1093,15 @@ void Car::onReceiveZigbeeMessage(uint8_t* buf) {
             Serial.print("[DEBUG] licensePlateNumberLowReturnCount:");
             Serial.print(netSynchronization.licensePlateNumberLowReturnCount);
             Serial.println();
+#endif
             break;
 #endif
     }
-#endif
 }
-
 
 bool NetSynchronization::synchronousGlobalVariable(uint8_t name, uint16_t value) {
     globalVariable[name] = value;
     globalVariableVersion[name]++;
-
-    //char aabb[256] = {};
-    //aabb[255] = 'a';
-    //Serial.print(aabb);
 
 #if DE_BUG
     Serial.print("[DEBUG] synchronousGlobalVariable...");
@@ -1035,7 +1121,7 @@ bool NetSynchronization::synchronousGlobalVariable(uint8_t name, uint16_t value)
 
     uint8_t buf[] = {DATA_FRAME_HEADER, 0x01, 0x01, name, (uint8_t) (value >> 8), (uint8_t) (value), 0x00, DATA_FRAME_TAIL};
 
-    bool s = messageBus.sendAndWait(buf, 8, &globalVariableReturnCount);
+    bool s = messageBus.sendAndWait(buf, 8, globalVariableReturnCount + name);
 
 #if DE_BUG
     Serial.print("[DEBUG] synchronousGlobalVariable");
@@ -1122,14 +1208,15 @@ bool NetSynchronization::synchronousLicensePlateNumber(uint8_t* data) {
     if (!s) {
         return false;
     }
-#endif
-
+    return true;
+#else
     s = synchronousGlobalVariable(174, data, 6);
     if (!s) {
         return false;
     }
     s = synchronousGlobalVariable(173, 0xFFFF);
     return s;
+#endif
 }
 
 bool NetSynchronization::getLicensePlateNumber(uint8_t* buf) {
@@ -1182,7 +1269,6 @@ bool NetSynchronization::synchronousEntourageCarPos(uint16_t pos) {
     return synchronousGlobalVariable(214, pos);
 }
 
-
 Car::Car(uint8_t id) : DeviceBase(id) {
 }
 
@@ -1231,79 +1317,70 @@ uint16_t Car::getTrackLamp() {
     return code;
 }
 
+void Car::turnLeft(uint16_t speed, uint8_t angle) {
+    DCMotor.SpeedCtr(-speed, speed);
+    waitCodeDisc(-7.3 * angle);
+    DCMotor.Stop();
+}
+
+void Car::turnRight(uint16_t speed, uint8_t angle) {
+    DCMotor.SpeedCtr(speed, -speed);
+    waitCodeDisc(7.3 * angle);
+    DCMotor.Stop();
+}
 
 void Car::turnLeft(uint8_t angle) {
-#if DE_BUG
-    Serial.println("[DEBUG] in turnLeft...");
-#endif
-    DCMotor.SpeedCtr(-40, 40);
-    sleep(16 * angle);
-    DCMotor.Stop();
-#if DE_BUG
-    Serial.println("[DEBUG] end turnLeft...");
-#endif
+    turnLeft(turningSpeed, angle);
 }
 
 void Car::turnRight(uint8_t angle) {
-#if DE_BUG
-    Serial.println("[DEBUG] in turnRight...");
-#endif
-    DCMotor.SpeedCtr(40, -40);
-    sleep(16 * angle);
+    turnRight(turningSpeed, angle);
+}
+
+void Car::turnLeft() {
+    turnLeft(turningSpeed, 90);
+}
+
+void Car::turnRight() {
+    turnRight(turningSpeed, 90);
+}
+
+void Car::trackTurnLeft(uint16_t speed) {
+    int8_t angle = k210.getCameraSteeringGearAngleCache();
+    k210.setCameraSteeringGearAngle(-80);
+
+    turnLeft(speed, 45);
+    DCMotor.SpeedCtr(-speed, speed);
+    rotationProcess();
     DCMotor.Stop();
-#if DE_BUG
-    Serial.println("[DEBUG] end turnRight...");
-#endif
+
+    k210.setCameraSteeringGearAngle(angle);
+}
+
+void Car::trackTurnRight(uint16_t speed) {
+    int8_t angle = k210.getCameraSteeringGearAngleCache();
+    k210.setCameraSteeringGearAngle(-80);
+
+    turnRight(speed, 45);
+    DCMotor.SpeedCtr(speed, -speed);
+    rotationProcess();
+    DCMotor.Stop();
+
+    k210.setCameraSteeringGearAngle(angle);
 }
 
 void Car::trackTurnLeft() {
-
-#if DE_BUG
-    Serial.println("[DEBUG] in trackTurnLeft...");
-#endif
-    int8_t angle = k230.getCameraSteeringGearAngleCache();
-    k230.setCameraSteeringGearAngle(-80);
-
-    DCMotor.SpeedCtr(-turningSpeed, turningSpeed);
-    rotationProcess();
-    DCMotor.Stop();
-
-    k230.setCameraSteeringGearAngle(angle);
-
-#if DE_BUG
-    Serial.println("[DEBUG] end trackTurnLeft...");
-#endif
+    trackTurnLeft(turningSpeed);
 }
 
 void Car::trackTurnRight() {
-
-#if DE_BUG
-    Serial.println("[DEBUG] in trackTurnRight...");
-#endif
-    int8_t angle = k230.getCameraSteeringGearAngleCache();
-    k230.setCameraSteeringGearAngle(-80);
-
-    DCMotor.SpeedCtr(turningSpeed, -turningSpeed);
-    rotationProcess();
-    DCMotor.Stop();
-
-    k230.setCameraSteeringGearAngle(angle);
-#if DE_BUG
-    Serial.println("[DEBUG] end trackTurnRight...");
-#endif
+    trackTurnRight(turningSpeed);
 }
 
 void Car::rotationProcess() {
     //sleep(1500);
-
     unsigned long startTime = millis();
 
-    while (millis() - startTime < outTimeMs) {
-        acceptTrackFlag();
-        if (!trackRowResult.bitCount) {
-            break;
-        }
-    }
     while (millis() - startTime < outTimeMs) {
         acceptTrackFlag();
         if (trackRowResult.centerBitCount >= 3) {
@@ -1318,34 +1395,30 @@ void Car::waitCodeDisc(int16_t distance) {
     uint16_t old = getCodeDisc();
     while (true) {
         uint16_t current = getCodeDisc();
-        auto delta = static_cast<int16_t>(current - old);
+        int16_t delta = (int16_t) (current - old);
         if ((distance > 0 && delta >= distance) || (distance < 0 && delta <= distance)) {
             break;
         }
         yield();
     }
+    acceptTrackFlag();
 }
 
-void Car::trackAdvanceToNextJunction() {
+void Car::trackAdvance(uint16_t speed, uint16_t distance) {
     unsigned long startTime = millis();
+    uint16_t old = getCodeDisc();
 
-    DCMotor.SpeedCtr(straightSpeed, straightSpeed);
+    DCMotor.SpeedCtr(speed, speed);
 
     while (millis() - startTime < outTimeMs) {
-        acceptTrackFlag();
 
-        if ((trackRowResult.edgeBitCount >= 6 || trackRowResult.bitCount >= 12)) {
-
-#if DE_BUG
-            Serial.println("[DEBUG] meet a junction...");
-#endif
-
-            // -80 m : 350
-            advance(580);
-            trimCar();
+        uint16_t current = getCodeDisc();
+        int16_t delta = (int16_t) (current - old);
+        if ((distance > 0 && delta >= distance)) {
             break;
-
         }
+
+        acceptTrackFlag();
 
         if (inRand(trackRowResult.offset, -0.2, 0.2)) {
 
@@ -1364,70 +1437,136 @@ void Car::trackAdvanceToNextJunction() {
         }
 
     }
+
     DCMotor.Stop();
 
 }
 
-void Car::overspecificRelief() {
+void Car::trackAdvance(uint16_t distance) {
+    trackAdvance(straightSpeed, distance);
+}
+
+void Car::trackAdvanceToNextJunction(uint16_t speed) {
     unsigned long startTime = millis();
 
+    DCMotor.SpeedCtr(speed, speed);
+
     while (millis() - startTime < outTimeMs) {
         acceptTrackFlag();
-        if (trackRowResult.flagBit == 0) {
+
+        if ((trackRowResult.edgeBitCount >= 6 || trackRowResult.bitCount >= 12)) {
+
+            DCMotor.Stop();
+            CoreBeep.TurnOn();
+            sleep(100);
+            CoreBeep.TurnOff();
+
+
+#if DE_BUG
+            Serial.println("[DEBUG] meet a junction...");
+#endif
+
+            // -80 m : 350
+            advance(580);
+            trimCar();
+            break;
+
+        }
+
+        if (inRand(trackRowResult.offset, -0.2, 0.2)) {
+
+            int16_t lSpeed = speed;
+            int16_t rSpeed = speed;
+
+            lSpeed += ((int16_t) (trackRowResult.offset * straightLineKpSpeed));
+            rSpeed -= ((int16_t) (trackRowResult.offset * straightLineKpSpeed));
+
+            DCMotor.SpeedCtr(
+                    lSpeed,
+                    rSpeed
+            );
+        } else {
+            trimCar();
+        }
+
+    }
+    DCMotor.Stop();
+
+}
+
+void Car::trackAdvanceToNextJunction() {
+    trackAdvanceToNextJunction(straightSpeed);
+}
+
+void Car::overspecificRelief() {
+
+    unsigned long startTime = millis();
+    while (millis() - startTime < outTimeMs) {
+        acceptTrackFlag();
+        if (trackRowResult.flagBit <= 2) {
             break;
         }
-        advance(30);
+        advance(50);
+        carSleep(50);
         trimCar();
-        sleep(100);
     }
 
-    while (millis() - startTime < outTimeMs) {
-        acceptTrackFlag();
+    /* while (millis() - startTime < outTimeMs) {
+         acceptTrackFlag();
 
-        uint8_t lc = countBits(trackRowResult.flagBitArray, 2, 0, 4);
-        uint8_t rc = countBits(trackRowResult.flagBitArray, 2, 12, 16);
+         uint8_t lc = countBits(trackRowResult.flagBitArray, 2, 0, 4);
+         uint8_t rc = countBits(trackRowResult.flagBitArray, 2, 12, 16);
 
-        if (lc == 0 && rc == 0) {
-            advance(10);
-            sleep(50);
-            continue;
-        }
+         if (lc == 4 && rc == 4) {
+             break;
+         }
 
-        if (lc == 4 && rc == 4) {
-            break;
-        }
+         if (lc != 0 && rc != 0) {
+             DCMotor.SpeedCtr(
+                     lc > rc
+                     ? -10
+                     : 10,
+                     lc > rc
+                     ? 10
+                     : -10
+             );
 
-        DCMotor.SpeedCtr(
-                lc > rc
-                ? -turningSpeed
-                : turningSpeed,
-                lc > rc
-                ? turningSpeed
-                : -turningSpeed
-        );
+             sleep(35);
+             DCMotor.Stop();
+         }
 
-        sleep(50);
-        DCMotor.Stop();
+         advance(10, 10);
+         carSleep(100);
+         continue;
+     }*/
 
-        carSleep(100);
-    }
+    trimCarByLine();
 
+    advance(1100);
 
-    while (millis() - startTime < outTimeMs) {
+    DCMotor.Stop();
+
+    CoreBeep.TurnOn();
+    sleep(100);
+    CoreBeep.TurnOff();
+
+    /*while (millis() - startTime < outTimeMs) {
 
         DCMotor.SpeedCtr(straightSpeed, straightSpeed);
 
         acceptTrackFlag();
 
-        if (trackRowResult.flagBit == 0) {
+        if (trackRowResult.flagBit <= 2) {
 
             advance(100);
 
             acceptTrackFlag();
 
-            if (trackRowResult.edgeBitCount <= 3) {
+            if (trackRowResult.edgeBitCount <= 2) {
                 break;
             }
+
+            break;
 
         }
 
@@ -1454,9 +1593,12 @@ void Car::overspecificRelief() {
             trimCar();
         }
 
-    }
+    }*/
 
     DCMotor.Stop();
+
+    carSleep(200);
+
 }
 
 void Car::advanceToNextJunction() {
@@ -1465,7 +1607,7 @@ void Car::advanceToNextJunction() {
     DCMotor.SpeedCtr(straightSpeed, straightSpeed);
     while (millis() - startTime < outTimeMs) {
         acceptTrackFlag();
-        if ((trackRowResult.edgeBitCount >= 6 || trackRowResult.bitCount >= 12)) {
+        if ((trackRowResult.edgeBitCount >= 5 || trackRowResult.bitCount >= 12)) {
             DCMotor.Stop();
             break;
         }
@@ -1481,7 +1623,7 @@ void Car::recoilToNextJunction() {
     while (millis() - startTime < outTimeMs) {
         acceptTrackFlag();
 
-        if ((trackRowResult.edgeBitCount >= 6 || trackRowResult.bitCount >= 12)) {
+        if ((trackRowResult.edgeBitCount >= 5 || trackRowResult.bitCount >= 12)) {
             DCMotor.Stop();
             break;
         }
@@ -1489,24 +1631,31 @@ void Car::recoilToNextJunction() {
     }
 }
 
-void Car::advance(uint16_t distance) {
+void Car::advance(int16_t speed, uint16_t distance) {
     DCMotor.SpeedCtr(
-            straightSpeed,
-            straightSpeed
+            speed,
+            speed
     );
     waitCodeDisc((int16_t) distance);
     DCMotor.Stop();
 }
 
-void Car::recoil(uint16_t distance) {
+void Car::recoil(uint16_t speed, uint16_t distance) {
     DCMotor.SpeedCtr(
-            -straightSpeed,
-            -straightSpeed
+            -speed,
+            -speed
     );
     waitCodeDisc(-(int16_t) distance);
     DCMotor.Stop();
 }
 
+void Car::advance(uint16_t distance) {
+    advance(straightSpeed, distance);
+}
+
+void Car::recoil(uint16_t distance) {
+    recoil(straightSpeed, distance);
+}
 
 void Car::mobileCorrection(uint16_t step) {
     unsigned long startTime = millis();
@@ -1584,7 +1733,7 @@ void Car::trimCar(TrackRowResult* trackRowResult, float offset) {
             break;
         }
 
-        auto time = (int16_t) (430.0f * trimOffset);
+        int16_t time = (int16_t) (430.0f * trimOffset);
         time = time < 0 ? -time : time;
         time = time > 100 ? 100 : time;
 
@@ -1612,17 +1761,52 @@ void Car::trimCar(TrackRowResult* trackRowResult, float offset) {
 #endif
 }
 
+void Car::trimCarByLine() {
+
+    unsigned long startTime = millis();
+    while (millis() - startTime < outTimeMs) {
+        acceptTrackFlag();
+
+        uint8_t lc = countBits(trackRowResult.flagBitArray, 2, 0, 4);
+        uint8_t rc = countBits(trackRowResult.flagBitArray, 2, 12, 16);
+
+        if (lc == 4 && rc == 4) {
+            break;
+        }
+
+        if (lc != 0 && rc != 0) {
+            DCMotor.SpeedCtr(
+                    lc > rc
+                    ? -10
+                    : 10,
+                    lc > rc
+                    ? 10
+                    : -10
+            );
+
+            sleep(35);
+            DCMotor.Stop();
+        }
+
+        advance(10, 10);
+        carSleep(100);
+        continue;
+    }
+
+    acceptTrackFlag();
+
+}
 
 /***
  * 矫正车身，与寻迹线平行（增强版）
  * 策略：当高低寻迹线偏移量相等且趋近零时，认为车身已平行
  */
 void Car::rightCar() {
-    uint8_t trackModel = k230.getTrackModelCache();
-    int8_t angle = k230.getCameraSteeringGearAngleCache();
+    uint8_t trackModel = k210.getTrackModelCache();
+    int8_t angle = k210.getCameraSteeringGearAngleCache();
 
-    k230.setCameraSteeringGearAngle(-55);
-    k230.setTrackModel(TRACK_LOW | TRACK_HIGH);
+    k210.setCameraSteeringGearAngle(-55);
+    k210.setTrackModel(TRACK_LOW | TRACK_HIGH);
     carSleep(200); // 等待摄像头稳定
 
     unsigned long startTime = millis();
@@ -1644,8 +1828,8 @@ void Car::rightCar() {
 
     }
 
-    k230.setCameraSteeringGearAngle(angle);
-    k230.setTrackModel(trackModel);
+    k210.setCameraSteeringGearAngle(angle);
+    k210.setTrackModel(trackModel);
     carSleep(200); // 恢复原始状态的稳定时间
 }
 
@@ -1685,13 +1869,12 @@ void Car::trimCar() {
 #endif
 }*/
 
-
 bool Car::acceptTrackFlag() {
-    bool successful = k230.getTrackFlagBit(flagBitArray);
+    bool successful = k210.getTrackFlagBit(flagBitArray);
 
     if (successful) {
 
-        uint8_t tackModel = k230.getTrackModelCache();
+        uint8_t tackModel = k210.getTrackModelCache();
 
         if (tackModel & TRACK_HIGH) {
             acceptTrackRowFlag(&trackRowResultHigh);
@@ -1871,7 +2054,7 @@ StreetLamp streetLampA(0xFF);
 StereoscopicDisplay stereoscopicDisplayA(0x11);
 
 UltrasonicDevice ultrasonicDevice;
-K230 k230(0x02);
+K210 k210(0x02);
 NetSynchronization netSynchronization;
 Car car(0x02);
 MainCar mainCar(0x01);
