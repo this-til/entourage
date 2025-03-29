@@ -28,18 +28,22 @@ public:
     void turnLeftTest();
 
     void trackTurnLeftTest();
+
+    void reverseIntoTheCarportTest();
+
+    void trimCarByLineTest();
 };
 
 
-class K230Test {
+class K210Test {
 public:
     void qrRecognizeTest();
 
-    K230Test();
+    K210Test();
 };
 
 extern CarTest carTest;
 
-extern K230Test k230Test;
+extern K210Test k210Test;
 
 #endif //ENTOURAGE_CLION_TEST_H

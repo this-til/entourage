@@ -140,7 +140,7 @@ public:
 
     void addVerify(uint8_t* buf, uint8_t len);
 
-    void send(uint8_t* buf, uint8_t len, uint16_t bus = 0x6008, bool addVerify = true, unsigned long sendCoolingMs = 300);
+    void send(uint8_t* buf, uint8_t len, uint16_t bus = 0x6008, bool addVerify = true, unsigned long sendCoolingMs = 500);
 
     bool sendAndWait(uint8_t* buf, uint8_t len, const uint8_t* returnCount, uint16_t bus = 0x6008, bool addVerify = true, unsigned long sendCoolingMs = 300, unsigned long maxWaitingTimeMs = 5000);
 
@@ -201,7 +201,6 @@ class BarrierGate : public DeviceBase {
 public:
     VALUE_VERSION(bool, gateControl)
 
-
     explicit BarrierGate(uint8_t id);
 
     /***
@@ -223,7 +222,12 @@ public:
      * @param data len = 6
      * @return
      */
-    void setLicensePlateData(uint8_t* data);
+    void setLicensePlateData(uint8_t data[6]);
+
+    /***
+     * 发送并且等待道闸打开
+     */
+    bool sendLicensePlateDataAndWaitOpen(uint8_t data[6], unsigned long outTimeMs = 10000);
 
     /***
      * 获取门闸
@@ -386,7 +390,6 @@ public:
     bool getInfraredState(bool* ventral, bool* rearSide);
 
     void onReceiveZigbeeMessage(uint8_t* buf) override;
-
 
 };
 
@@ -593,23 +596,6 @@ public:
     void adjustDistance(uint8_t carSeep, uint8_t targetDistance, double errorMargin = 0.2, unsigned long controlTime_ms = 2000, int wait = 30);
 };
 
-struct QrMessage {
-
-    /***
- * 二维码信息容器
- */
-    uint8_t* message = nullptr;
-
-    uint8_t messageMaxLen = 0;
-
-    uint8_t messageLen = 0;
-
-    bool efficient{};
-
-    K210Color qrColor = K_WHITE;
-};
-
-
 class K210 : DeviceBase {
 public:
 
@@ -653,7 +639,7 @@ public:
      * @param qrMessageArray
      * @param len
      */
-    bool qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen);
+    bool qrRecognize(uint8_t* count, struct QrMessage* qrMessageArray, uint8_t maxLen);
 
     /***
      * 检测红绿灯
@@ -681,9 +667,9 @@ public:
     void clearSerialPort();
 
 private:
-    uint8_t trackModel{};
+    uint8_t trackModel = 0;
     bool receiveTrack;
-    int8_t cameraSteeringGearAngle{};
+    int8_t cameraSteeringGearAngle = 0;
 
     unsigned long lastAcquisitionTime;
 };
@@ -822,6 +808,11 @@ public:
      */
     void mobileCorrection(uint16_t step);
 
+    /***
+ * 倒车入库，在车库前车屁股对准车库
+ */
+    void reverseIntoTheCarport(Carport* carport, uint8_t moveLevel);
+
     bool acceptTrackFlag();
 
     /***
@@ -910,14 +901,15 @@ public:
      * @param data len = 6
      * @return
      */
-    bool synchronousLicensePlateNumber(uint8_t* data);
+    bool synchronousLicensePlateNumber(uint8_t data[6]);
 
     /***
      * 获取车牌号信息
+     * 用来开道闸
      * @param buf len = 6
      * @return 是否是有效信息
      */
-    bool getLicensePlateNumber(uint8_t* buf);
+    bool getLicensePlateNumber(uint8_t buf[6]);
 
     /***
      * 同步路径信息

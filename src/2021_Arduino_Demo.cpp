@@ -1,22 +1,23 @@
 #include "2021_Arduino_Demo.h"
+#include <avr/wdt.h>
 
+defineTask(TaskMain);
+defineTask(TaskCar);
 
-
-
-
-/*void setup() {
+/*
+void setup() {
     l_setup();
 }
 
 void loop() {
     l_loop();
-}*/
-
-defineTask(TaskMain);
-defineTask(TaskCar);
+}
+*/
 
 
 void l_setup() {
+    uint8_t reset_cause = MCUSR;
+
     Serial.begin(115200);
     Serial3.begin(9600);
     // 初始化串口通信，波特率115200
@@ -51,7 +52,7 @@ void l_setup() {
 
     mySCoop.start();
 
-    Serial.println("init end");
+    Serial.println("init end;");
 
 }
 
@@ -235,20 +236,14 @@ void keyHandler(uint8_t k_value) {
 
     switch (k_value) {
         case 0x01:
-            questions.questions2023();
-            //carTest.overspecificReliefTest();
+            questions.questions10();
             break;
         case 0x02:
-            //carTest.advanceCorrectionTest();
-
             netSynchronization.synchronousGlobalVariable('q', 0);
-            //carTest.overspecificReliefTest();
-
-            //carTest.overspecificReliefTest();
-
             break;
         case 0x03:
 
+            carTest.reverseIntoTheCarportTest();
             //carTest.turnLeftTest();
 
             /*   cameraState++;
@@ -303,6 +298,8 @@ void keyHandler(uint8_t k_value) {
 
             break;
         case 0x04:
+
+            carTest.advanceCorrectionTest();
 
             /*renderToScreen = !renderToScreen;
             k210.setRenderToScreen(renderToScreen);*/

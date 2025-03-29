@@ -294,12 +294,25 @@ void BarrierGate::setLicensePlateData(uint8_t* data) {
     messageBus.send(buf2, 8);
 }
 
+bool BarrierGate::sendLicensePlateDataAndWaitOpen(uint8_t* data, unsigned long outTimeMs) {
+    unsigned long startTime = millis();
+    while (millis() - startTime < outTimeMs) {
+        barrierGateA.setLicensePlateData(data);
+        CoreBeep.TurnOn();
+        sleep(200);
+        CoreBeep.TurnOff();
+        if (barrierGateA.getGateControl()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool BarrierGate::getGateControl() {
     uint8_t buf[] = {DATA_FRAME_HEADER, id, 0x20, 0x01, 0x00, 0x00, 0x00, DATA_FRAME_TAIL};
     bool* gateControl = nullptr;
     SEND_AND_DETECTED_VALUE_CHANGE(SEND(buf, 8), gateControl)
 }
-
 
 BusStop::BusStop(uint8_t id) : DeviceBase(id) {
 }
@@ -735,7 +748,7 @@ void K210::setRenderToScreen(bool open) {
 
 bool K210::getTrackFlagBit(uint8_t* result) {
 
-    if (lastAcquisitionTime - millis() > 500) {
+    if (lastAcquisitionTime - millis() > 200) {
         clearSerialPort();
     }
     lastAcquisitionTime = millis();
@@ -863,13 +876,13 @@ bool K210::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen
 #endif
 
         uint8_t messageLen = qrRecognizeBuf[7];
-        messageLen = messageLen > qrMessage->messageMaxLen
-                     ? qrMessage->messageMaxLen
+        messageLen = messageLen > qrMessage->str.maxLen
+                     ? qrMessage->str.maxLen
                      : messageLen < 0
                        ? 0
                        : messageLen;
 
-        qrMessage->messageLen = messageLen;
+        qrMessage->str.len = messageLen;
 
 #if DE_BUG
         Serial.print("message len:");
@@ -878,7 +891,7 @@ bool K210::qrRecognize(uint8_t* count, QrMessage* qrMessageArray, uint8_t maxLen
 #endif
 
         for (int i = 0; i < messageLen; ++i) {
-            qrMessage->message[i] = qrRecognizeBuf[8 + i];
+            qrMessage->str.str[i] = qrRecognizeBuf[8 + i];
         }
 
 #if DE_BUG
@@ -1065,6 +1078,11 @@ void Car::onReceiveZigbeeMessage(uint8_t* buf) {
             _buf[4] = buf[4];
             _buf[5] = buf[5];
             messageBus.send(_buf, 8);
+
+            netSynchronization.globalVariable[174] = buf[3];
+            netSynchronization.globalVariable[175] = buf[4];
+            netSynchronization.globalVariable[176] = buf[5];
+
             break;
         case 0xDE://~0x21
             netSynchronization.licensePlateNumberHighReturnCount++;
@@ -1086,6 +1104,14 @@ void Car::onReceiveZigbeeMessage(uint8_t* buf) {
             _buf[4] = buf[4];
             _buf[5] = buf[5];
             messageBus.send(_buf, 8);
+
+            netSynchronization.globalVariable[177] = buf[3];
+            netSynchronization.globalVariable[178] = buf[4];
+            netSynchronization.globalVariable[179] = buf[5];
+
+            netSynchronization.globalVariable[173] = 0xFFFF;
+            netSynchronization.globalVariableVersion[173]++;
+
             break;
         case 0xDD://~0x22
             netSynchronization.licensePlateNumberLowReturnCount++;
@@ -1208,6 +1234,13 @@ bool NetSynchronization::synchronousLicensePlateNumber(uint8_t* data) {
     if (!s) {
         return false;
     }
+
+    for (int i = 0; i < 6; ++i) {
+        globalVariable[174 + i] = data[i];
+    }
+
+    globalVariable[173] = 1;
+
     return true;
 #else
     s = synchronousGlobalVariable(174, data, 6);
@@ -1349,7 +1382,7 @@ void Car::trackTurnLeft(uint16_t speed) {
     int8_t angle = k210.getCameraSteeringGearAngleCache();
     k210.setCameraSteeringGearAngle(-80);
 
-    turnLeft(speed, 45);
+    turnLeft(speed, 30);
     DCMotor.SpeedCtr(-speed, speed);
     rotationProcess();
     DCMotor.Stop();
@@ -1361,7 +1394,7 @@ void Car::trackTurnRight(uint16_t speed) {
     int8_t angle = k210.getCameraSteeringGearAngleCache();
     k210.setCameraSteeringGearAngle(-80);
 
-    turnRight(speed, 45);
+    turnRight(speed, 30);
     DCMotor.SpeedCtr(speed, -speed);
     rotationProcess();
     DCMotor.Stop();
@@ -1401,6 +1434,7 @@ void Car::waitCodeDisc(int16_t distance) {
         }
         yield();
     }
+    DCMotor.Stop();
     acceptTrackFlag();
 }
 
@@ -1467,7 +1501,7 @@ void Car::trackAdvanceToNextJunction(uint16_t speed) {
 #endif
 
             // -80 m : 350
-            advance(580);
+            advance(520);
             trimCar();
             break;
 
@@ -1506,7 +1540,7 @@ void Car::overspecificRelief() {
         if (trackRowResult.flagBit <= 2) {
             break;
         }
-        advance(50);
+        advance(35);
         carSleep(50);
         trimCar();
     }
@@ -1624,11 +1658,12 @@ void Car::recoilToNextJunction() {
         acceptTrackFlag();
 
         if ((trackRowResult.edgeBitCount >= 5 || trackRowResult.bitCount >= 12)) {
-            DCMotor.Stop();
             break;
         }
 
     }
+
+    DCMotor.Stop();
 }
 
 void Car::advance(int16_t speed, uint16_t distance) {
@@ -1694,7 +1729,7 @@ void Car::advanceCorrection(uint16_t step, uint8_t maximumFrequency) {
 
         carSleep(50);
         acceptTrackFlag();
-        bool inRand = inRand(trackRowResult.offset, -0.08, 0.08);
+        bool inRand = trackRowResult.offset == 0;
         trimCar();
         if (inRand) {
             positiveAttitude++;
@@ -1708,10 +1743,10 @@ void Car::advanceCorrection(uint16_t step, uint8_t maximumFrequency) {
         advanceTag++;
         if (advanceTag <= maximumFrequency) {
             advance(step);
+
         } else {
             break;
         }
-
     }
 }
 
@@ -1762,6 +1797,8 @@ void Car::trimCar(TrackRowResult* trackRowResult, float offset) {
 }
 
 void Car::trimCarByLine() {
+
+    k210.clearSerialPort();
 
     unsigned long startTime = millis();
     while (millis() - startTime < outTimeMs) {
@@ -1833,41 +1870,30 @@ void Car::rightCar() {
     carSleep(200); // 恢复原始状态的稳定时间
 }
 
-/*const float KP_ANGLE = 40.0; // 方向误差比例系数（角度调整）
-const float KP_POSITION = 20.0; // 位置误差比例系数（中线调整）
 
+void Car::reverseIntoTheCarport(Carport* carport, uint8_t moveLevel) {
+    carport->moveToLevel(1);
 
-*//***
- * 微调车姿态
- *//*
-void Car::trimCar() {
+    advanceCorrection(50, 6);
 
-#if DE_BUG
-    Serial.println("[DEBUG] in trimCar...");
-#endif
-
-    unsigned long startTime = millis();
-
-    while (millis() - startTime < trimOutTimeMs) {
-        acceptTrackFlag();
-
-        float angleError = highOffset - lowOffset;
-        float positionError = (highOffset + lowOffset) / 2.0f;
-        float adjustment = (KP_ANGLE * angleError) + (KP_POSITION * positionError);
-
-        if (fabs((double) angleError) < 0.1 && fabs((double) positionError) < 0.1) {
-            break;
+    uint8_t level = 0;
+    while (true) {
+        if (carport->getLevel(&level)) {
+            if (level == 1) {
+                break;
+            }
         }
-
-        DCMotor.SpeedCtr((int16_t) adjustment, (int16_t) -adjustment);
     }
+
+    recoilToNextJunction();
+
+    recoil(400);
 
     DCMotor.Stop();
 
-#if DE_BUG
-    Serial.println("[DEBUG] end trimCar...");
-#endif
-}*/
+    carport->moveToLevel(moveLevel);
+}
+
 
 bool Car::acceptTrackFlag() {
     bool successful = k210.getTrackFlagBit(flagBitArray);
@@ -1908,6 +1934,9 @@ void Car::ledShine(int number, int wait) {
     }
 }
 
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch"
 
 void SandTable::adjustDirection(Pos pos, Direction current, Direction target) {
     if (current == target) {
@@ -1985,6 +2014,8 @@ void SandTable::adjustDirection(Pos pos, Direction current, Direction target) {
 
     car.trimCar();
 }
+
+#pragma clang diagnostic pop
 
 void SandTable::move(Pos a, Pos b) {
     if (unpack(a) == assembly("B6") && unpack(a) == assembly("D6")) {

@@ -115,35 +115,52 @@ void assembly(const char* str, uint16_t* outArray, uint8_t maxArrayLen);
 /***
  * 排除source中的特殊字符，并且输出到out
  */
-void excludeSpecialCharacter(const uint8_t* source, uint16_t sourceLen, uint8_t* out, uint16_t outMaxLen, uint16_t* outLen);
+void excludeSpecialCharacter(struct Str* source, struct Str* out);
 
 /***
  * 通过matchingItem排除特定字符
  * @param matchingItem len = 256 Map<uint8_t, bool> if v true 将排除
  */
-void excludeCharacter(const uint8_t* source, uint16_t sourceLen, uint8_t* out, uint16_t outMaxLen, uint16_t* outLen, uint8_t* matchingItem);
+void excludeCharacter(struct Str* source, struct Str* out, bool matchingItem[256]);
+
+enum ExtractCharacterMode {
+    /***
+     * ABC<ED>FG -> ED , AB<CE<EF>G> -> CE<EF
+     */
+    first,
+
+    /***
+     * ABC<D<EF>>G -> EF
+     */
+    deepest,
+
+    /***
+     * ABC<AD<AD>> -> AD<AD>
+     */
+    shallowest,
+
+    /***
+     * ABC<DE>FG -> ABCFG , A<BC>D<EF> -> AD
+     */
+    extra,
+};
 
 /***
  * 提取指定up、down中间或者外面的数据
  */
-void extractCharacter(const uint8_t* str, uint16_t strLen, uint8_t* outStr, uint16_t maxLen, uint16_t* outLen, uint8_t up = '<', uint8_t down = '>', bool inRadius = true);
-
-/***
- * 深度提取字符
- * 
- */
-void profundityExtractCharacter(const uint8_t* str, uint16_t strLen, uint8_t* outStr, uint16_t maxLen, uint16_t* outLen, uint8_t up = '<', uint8_t down = '>', bool inRadius = true);
+void extractCharacter(struct Str* str, struct Str* out, enum ExtractCharacterMode extractCharacterMode = shallowest, uint8_t up = '<', uint8_t down = '>');
 
 /***
  * 匹配特定字符
  * @param str 源
- * @param strLen 源长度
  * @param matchingEntry 匹配项
- * @param matchingEntryLen 匹配项长度
- * @param preferredMatch 第一个匹配成功的字符索引
- * @return
+ * @return 第一个匹配成功的字符索引 if -1 表示未找到
  */
-bool inclusiveCharacter(const uint8_t* str, uint16_t strLen, uint8_t* matchingEntry, uint16_t matchingEntryLen, uint16_t* preferredMatch = nullptr);
+int16_t inclusiveCharacter(struct Str* str, struct Str* matchingEntry);
+
+int16_t inclusiveCharacter(struct Str* str, uint8_t* matchingEntry, uint16_t matchingEntryLen);
+
+int16_t inclusiveCharacter(struct Str* str, uint8_t* matchingEntry);
 
 /***
  * 找不同
@@ -156,13 +173,19 @@ bool inclusiveCharacter(const uint8_t* str, uint16_t strLen, uint8_t* matchingEn
  *
  * @param out len为偶数，不然将会舍弃最后一位
  */
-void spotTheDifference(const uint8_t* strA, const uint8_t* strB, uint16_t strLen, uint8_t* out, uint16_t maxOutLen, uint16_t* countOfDifferentTerms = nullptr);
+void spotTheDifference(struct Str* strA, struct Str* strB, struct Str* out, uint16_t* countOfDifferentTerms = nullptr);
 
 /***
  * 将两位ascii字符(0~F)组成一位16进制的字符
+ * 例如 FEFA -> 0xFE 0xFA
  */
-void asciiToHex(const uint8_t* str, uint16_t strLen, uint8_t* out, uint16_t maxOutLen, uint16_t* outLen);
+void asciiToHex(struct Str* str, struct Str* out);
 
+/***
+ * 将byte转换成2位字符
+ * 例如 0xFE -> FE
+ */
+void hexToAscii(struct Str* str, struct Str* out);
 
 /***
  * 表达式求值
@@ -170,8 +193,6 @@ void asciiToHex(const uint8_t* str, uint16_t strLen, uint8_t* out, uint16_t maxO
  * @param variable 长度为256的数组 使用variable['n']获取变量
  * @return
  */
-int16_t
-
-evaluateTheExpression(const uint8_t* expression, uint16_t variable[]);
+int16_t evaluateTheExpression(const uint8_t* expression, uint16_t variable[256]);
 
 #endif //ENTOURAGE_CLION_UTIL_H

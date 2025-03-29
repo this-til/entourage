@@ -56,7 +56,7 @@
 // these 2 variables could changed to int16_t without any issue !
 
 #define SCoopDefaultQuantum   400    // recomended before switching to next task. this provide a 5% overhead time used by scheduler, for 3 tasks+loop
-#define SCoopDefaultStackSize 150    // to be experimented by user. seems enough for a task with couple of variable and a call to serial.print
+#define SCoopDefaultStackSize 512    // to be experimented by user. seems enough for a task with couple of variable and a call to serial.print
 #define AndroidSchedulerDefaultStack SCoopDefaultStackSize
 
 #define micros_t     int16_t         // used for low level time handling. MUST not be changed to int32 
@@ -521,7 +521,7 @@ private:  // only internal methods used to optimize code size or readabilty
     __attribute__((always_inline));            // internal use only, to split cod into eementary function, facilitate inlining
 
     virtual void run() {}                     // not really used by us. putting it in private should avoid further overloading for derived object.
-    __attribute__((used));                     // user will get an error message if trying to overload this method. loop() should be used!
+    __attribute__((used));                     // user will get an error _qrMessage if trying to overload this method. loop() should be used!
 
     // total variable size = 12 on AVR and 22 on ARM if TIMEREPORT = 0
 };                                           // total variable size = 16 on AVR and 30 on ARM if TIMEREPORT >=1

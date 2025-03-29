@@ -5,7 +5,6 @@
 #ifndef ENTOURAGE_CLION_QUESTIONS_H
 #define ENTOURAGE_CLION_QUESTIONS_H
 
-#define HAVE_GARAGE false
 
 #include "def.h"
 

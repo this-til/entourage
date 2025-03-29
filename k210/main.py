@@ -6,34 +6,73 @@ from Maix import GPIO
 from fpioa_manager import fm
 from machine import PWM, UART, Timer
 
+# import uos
+# from maix import camera, display, image, nn, app
+
+# region SD
+
+# sd = SDCard(
+#    slot=1,  # 根据硬件选择槽位（不同开发板可能不同，如 Maix Dock 用 slot=2）
+#    width=1,
+#    cd=None,
+#    wp=None,
+#    sck=27,
+#    miso=28,
+#    mosi=29,
+#    cs=26,
+#    freq=4000000
+# )
+#
+# uos.mount(sd, "/sd")  # 挂载到 "/sd" 目录
+#
+# model_path = "/sd/qr.mud"  # 模型路径
+
+# endregion
+
+# region MODEL
+
+# detector = nn.YOLOv5(model=model_path, dual_buff=True)
+
+# endregion
+
 # region 配置
 DATA_FRAME_HEADER = 0x55
 DATA_FRAME_TAIL = 0xBB
 
 NATIVE_IDENTIFIER = 0x02
 
-NONE = 0x00
-WHITE = 0x01
-BLACK = 0x02
-RED = 0x03
-GREEN = 0x04
-YELLOW = 0x05
+NONE = 0x00,
+RED = 0x01,
+GREEN = 0x02,
+BLUE = 0x03,
+YELLOW = 0x04,
+MAGENTA = 0x05,
+CYAN = 0x06,
+BLACK = 0x07,
+WHITE = 0x08
 
 COLOR_TO_STRING_MAP = {
-    NONE: "NONE",
-    WHITE: "WHITE",
-    BLACK: "BLACK",
-    RED: "RED",
-    GREEN: "GREEN",
-    YELLOW: "YELLOW"
+    NONE: "K_NONE",
+    RED: "K_RED",
+    GREEN: "K_GREEN",
+    BLUE: "K_BLUE",
+    YELLOW: "K_YELLOW",
+    MAGENTA: "K_MAGENTA",
+    CYAN: "K_CYAN",
+    BLACK: "K_BLACK",
+    WHITE: "K_WHITE",
 }
+
 COLOR_TO_RBG_MAP = {
     NONE: (0, 0, 0),
-    WHITE: (255, 255, 255),
-    BLACK: (0, 0, 0),
     RED: (255, 0, 0),
     GREEN: (0, 255, 0),
+    BLUE: (0, 0, 255),
     YELLOW: (255, 255, 0),
+    MAGENTA: (255, 0, 255),
+    CYAN: (0, 255, 255),
+    BLACK: (0, 0, 0),
+    WHITE: (255, 255, 255),
 }
 
 CAMERA_RGB565 = 0x01
@@ -343,7 +382,7 @@ RECTANGLES_HIGH_LOW = []
 # RECTANGLES = HIGH_RECTANGLES + LOW_RECTANGLES
 # RECTANGLES_ROTATIONAL_TIME = HIGH_RECTANGLES + LOW_RECTANGLES_ROTATIONAL_TIME
 
-LINE_COLOR_THRESHOLD = [(0, 40)]
+LINE_COLOR_THRESHOLD = [(0, 50)]
 
 
 def initTrack():

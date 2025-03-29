@@ -4,7 +4,6 @@
 
 #include "Util.h"
 
-const char hex_chars[] = "0123456789ABCDEF";
 
 void logHex(uint8_t p) {
     Serial.print(hex_chars[(p >> 4) & 0x0F]);
@@ -140,6 +139,9 @@ void logObj(K210Color k210Color) {
         case K_YELLOW:
             Serial.print("YELLOW");
             return;
+        case K_BLUE:
+            Serial.print("BLUE");
+            break;
     }
     Serial.print("NULL");
 }
@@ -311,7 +313,6 @@ void lonelinessExclusion(uint8_t* value, uint32_t len, uint8_t* outValue) {
 
 }
 
-
 float centralPoint(uint8_t* value, uint32_t len, float* centerShift, float* centerShiftOne) {
     /* uint32_t mLen = len * 8;
      float startingPoint = -1;
@@ -433,40 +434,190 @@ void analyze(uint16_t* array, uint8_t maxArrayLen, char* outStr, uint8_t maxStrL
     outStr[outIndex] = '\0';
 }
 
-void excludeSpecialCharacter(const uint8_t* source, uint16_t sourceLen, uint8_t* out, uint16_t outMaxLen, uint16_t* outLen) {
-    uint8_t outIndex = 0;
-    for (uint8_t i = 0; i < sourceLen; ++i) {
-        uint8_t c = source[i];
+void excludeSpecialCharacter(struct Str* source, struct Str* out) {
+    uint16_t outIndex = 0;
+    for (uint16_t i = 0; i < source->len; ++i) {
+        uint8_t c = source->str[i];
         if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
-            out[outIndex] = c;
+            out->str[outIndex] = c;
             outIndex++;
-            if (outIndex >= outMaxLen) {
+            if (outIndex >= out->maxLen) {
                 break;
             }
         }
     }
-    if (outLen != nullptr) {
-        *outLen = outIndex;
-    }
+    out->len = outIndex;
 }
 
-void excludeCharacter(const uint8_t* source, uint16_t sourceLen, uint8_t* out, uint16_t outMaxLen, uint16_t* outLen, uint8_t* matchingItem) {
+void excludeCharacter(struct Str* source, struct Str* out, bool matchingItem[256]) {
 
-    uint8_t outIndex = 0;
-    for (uint8_t i = 0; i < sourceLen; ++i) {
-        uint8_t c = source[i];
+    uint16_t outIndex = 0;
+    for (uint16_t i = 0; i < source->len; ++i) {
+        uint8_t c = source->str[i];
         if (matchingItem[c]) {
             continue;
         }
-        out[outIndex] = c;
+        out->str[outIndex] = c;
         outIndex++;
-        if (outIndex >= outMaxLen) {
+        if (outIndex >= out->maxLen) {
             break;
         }
     }
 
-    if (outLen != nullptr) {
-        *outLen = outIndex;
+    out->len = outIndex;
+}
+
+typedef struct {
+    uint16_t start;
+    uint8_t depth;
+} StackEntry;
+
+typedef struct {
+    uint16_t start;
+    uint16_t end;
+    uint8_t depth;
+} TagInfo;
+
+StackEntry stack[8];
+TagInfo tags[8];
+
+void extractCharacter(struct Str* str, struct Str* out, enum ExtractCharacterMode extractCharacterMode, uint8_t up, uint8_t down) {
+    uint8_t* s = str->str;
+    uint16_t len = str->len;
+    out->len = 0;
+
+    switch (extractCharacterMode) {
+        case first: {
+            uint16_t start = 0;
+            // Find the first occurrence of 'up'
+            while (start < len && s[start] != up) {
+                start++;
+            }
+            if (start >= len) {
+                return; // No 'up' found
+            }
+            // Find the first 'down' after 'up'
+            uint16_t end = start + 1;
+            while (end < len && s[end] != down) {
+                end++;
+            }
+            if (end >= len) {
+                return; // No 'down' found
+            }
+            // Calculate the length to copy
+            uint16_t copy_len = end - start - 1;
+            if (copy_len > out->maxLen) {
+                copy_len = out->maxLen;
+            }
+            memcpy(out->str, s + start + 1, copy_len);
+            out->len = copy_len;
+            break;
+        }
+
+        case deepest:
+        case shallowest: {
+            int stack_top = -1;
+            int tags_count = 0;
+            uint8_t current_depth = 0;
+
+            for (uint16_t i = 0; i < len; ++i) {
+                if (s[i] == up) {
+                    stack_top++;
+                    stack[stack_top].start = i;
+                    stack[stack_top].depth = current_depth + 1;
+                    current_depth = stack[stack_top].depth;
+                } else if (s[i] == down) {
+                    if (stack_top >= 0) {
+                        StackEntry entry = stack[stack_top];
+                        stack_top--;
+                        current_depth = entry.depth - 1;
+                        tags[tags_count].start = entry.start;
+                        tags[tags_count].end = i;
+                        tags[tags_count].depth = entry.depth;
+                        tags_count++;
+                    }
+                }
+            }
+
+            if (extractCharacterMode == deepest) {
+                uint8_t max_depth = 0;
+                uint16_t best_start = 0, best_end = 0;
+                for (int j = 0; j < tags_count; ++j) {
+                    if (tags[j].depth > max_depth || (tags[j].depth == max_depth && j > 0)) {
+                        max_depth = tags[j].depth;
+                        best_start = tags[j].start;
+                        best_end = tags[j].end;
+                    }
+                }
+                if (max_depth == 0) {
+                    break;
+                }
+                uint16_t start_idx = best_start + 1;
+                uint16_t end_idx = best_end - 1;
+                if (start_idx > end_idx) {
+                    break;
+                }
+                uint16_t copy_len = end_idx - start_idx + 1;
+                if (copy_len > out->maxLen) {
+                    copy_len = out->maxLen;
+                }
+                memcpy(out->str, s + start_idx, copy_len);
+                out->len = copy_len;
+            } else { // shallowest
+                uint16_t out_idx = 0;
+                for (int j = 0; j < tags_count; ++j) {
+                    if (tags[j].depth == 1) {
+                        uint16_t start = tags[j].start + 1;  // 跳过`up`
+                        uint16_t end = tags[j].end - 1;      // 跳过`down`
+                        if (start > end) {
+                            continue;           // 无效区间跳过
+                        }
+
+                        uint16_t tag_len = end - start + 1;
+                        uint16_t remaining = out->maxLen - out_idx;
+                        if (tag_len > remaining) {
+                            tag_len = remaining;
+                        }
+                        memcpy(out->str + out_idx, s + start, tag_len);
+                        out_idx += tag_len;
+                        if (out_idx >= out->maxLen) {
+                            break;
+                        }
+                    }
+                }
+                out->len = out_idx;
+            }
+            break;
+        }
+
+        case extra: {
+            uint8_t depth = 0;
+            uint16_t out_idx = 0;
+            for (uint16_t i = 0; i < len; ++i) {
+                uint8_t c = s[i];
+                if (c == up) {
+                    depth++;
+                } else if (c == down) {
+                    if (depth > 0) {
+                        depth--;
+                    }
+                } else {
+                    if (depth == 0) {
+                        if (out_idx < out->maxLen) {
+                            out->str[out_idx++] = c;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+            out->len = out_idx;
+            break;
+        }
+
+        default:
+            // Handle unknown mode
+            break;
     }
 
 }
@@ -501,21 +652,21 @@ void extractCharacter(const uint8_t* str, uint16_t strLen, uint8_t* outStr, uint
     }
 }
 
-bool inclusiveCharacter(const uint8_t* str, uint16_t strLen, uint8_t* matchingEntry, uint16_t matchingEntryLen, uint16_t* preferredMatch) {
+int16_t inclusiveCharacter(struct Str* str, struct Str* matchingEntry) {
     // 边界条件检查：匹配项为空或源字符串长度不足
-    if (matchingEntryLen == 0 || strLen < matchingEntryLen) {
-        return false;
+    if (str->len == 0 || str->len < matchingEntry->len) {
+        return -1;
     }
 
     // 计算最大需要检查的起始位置
-    const uint16_t maxStartPos = strLen - matchingEntryLen;
+    const uint16_t maxStartPos = str->len - matchingEntry->len;
 
     // 遍历所有可能的起始位置
     for (uint16_t i = 0; i <= maxStartPos; i++) {
         // 检查当前位置是否匹配
         bool isMatch = true;
-        for (uint16_t j = 0; j < matchingEntryLen; j++) {
-            if (str[i + j] != matchingEntry[j]) {
+        for (uint16_t j = 0; j < matchingEntry->len; j++) {
+            if (str->str[i + j] != matchingEntry->str[j]) {
                 isMatch = false;
                 break;
             }
@@ -523,35 +674,48 @@ bool inclusiveCharacter(const uint8_t* str, uint16_t strLen, uint8_t* matchingEn
 
         // 找到匹配时设置偏移量并返回
         if (isMatch) {
-            if (preferredMatch != nullptr) {
-                *preferredMatch = i;
-            }
-            return true;
+            return i;
         }
     }
 
     // 未找到匹配项
-    return false;
+    return -1;
 }
 
+int16_t inclusiveCharacter(struct Str* str, uint8_t* matchingEntry, uint16_t matchingEntryLen) {
+    struct Str matching = {
+            .str  = matchingEntry,
+            .len = matchingEntryLen,
+            .maxLen = matchingEntryLen
+    };
+    return inclusiveCharacter(str, &matching);
+}
 
-void spotTheDifference(const uint8_t* strA, const uint8_t* strB, uint16_t strLen, uint8_t* out, uint16_t maxOutLen, uint16_t* countOfDifferentTerms) {
+int16_t inclusiveCharacter(struct Str* str, uint8_t* matchingEntry) {
+    return inclusiveCharacter(str, matchingEntry, strlen(reinterpret_cast<const char*>(matchingEntry)));
+}
+
+void spotTheDifference(struct Str* strA, struct Str* strB, struct Str* out, uint16_t* countOfDifferentTerms) {
+    uint16_t maxOutLen = out->maxLen;
     if (maxOutLen % 2 == 1) {
         maxOutLen--;
     }
+
     int maxItem = maxOutLen / 2;
     int item = 0;
-    for (int i = 0; i < strLen; ++i) {
-        if (strA[i] != strB[i]) {
 
-            out[item] = strA[i];
-            out[maxOutLen - item - 1] = strB[i];
+    uint16_t strLen = min(strA->len, strB->len);
+
+    for (int i = 0; i < strLen; ++i) {
+        if (strA->str[i] != strB->str[i]) {
+
+            out->str[item] = strA->str[i];
+            out->str[maxOutLen - item - 1] = strB->str[i];
 
             item++;
             if (item >= maxItem) {
                 break;
             }
-
         }
     }
     if (countOfDifferentTerms != nullptr) {
@@ -559,11 +723,11 @@ void spotTheDifference(const uint8_t* strA, const uint8_t* strB, uint16_t strLen
     }
 }
 
-void asciiToHex(const uint8_t* str, uint16_t strLen, uint8_t* out, uint16_t maxOutLen, uint16_t* outLen) {
+void asciiToHex(struct Str* str, struct Str* out) {
     uint16_t len = 0;
-    for (uint16_t i = 0; i + 1 < strLen && len < maxOutLen; i += 2) {
+    for (uint16_t i = 0; i + 1 < str->len && len < out->maxLen; i += 2) {
         // 处理高四位字符
-        uint8_t high = str[i];
+        uint8_t high = str->str[i];
         uint8_t highVal = 0;
         if (high >= '0' && high <= '9') {
             highVal = high - '0';
@@ -574,7 +738,7 @@ void asciiToHex(const uint8_t* str, uint16_t strLen, uint8_t* out, uint16_t maxO
         }
 
         // 处理低四位字符
-        uint8_t low = str[i + 1];
+        uint8_t low = str->str[i + 1];
         uint8_t lowVal = 0;
         if (low >= '0' && low <= '9') {
             lowVal = low - '0';
@@ -585,9 +749,40 @@ void asciiToHex(const uint8_t* str, uint16_t strLen, uint8_t* out, uint16_t maxO
         }
 
         // 合并高低四位并存入输出缓冲区
-        out[len++] = (highVal << 4) | lowVal;
+        out->str[len++] = (highVal << 4) | lowVal;
     }
-    *outLen = len; // 设置实际转换后的数据长度
+    out->len = len; // 设置实际转换后的数据长度
+}
+
+void hexToAscii(struct Str* str, struct Str* out) {
+    uint16_t out_len = 0;
+    for (uint16_t i = 0; i < str->len; i++) {
+        uint8_t byte = str->str[i];
+        // 处理高四位
+        uint8_t high = (byte >> 4) & 0x0F;
+        uint8_t high_char;
+        if (high < 10) {
+            high_char = '0' + high;
+        } else {
+            high_char = 'A' + (high - 10);
+        }
+        if (out_len >= out->maxLen) { break; }
+        out->str[out_len++] = high_char;
+
+        // 处理低四位
+        uint8_t low = byte & 0x0F;
+        uint8_t low_char;
+        if (low < 10) {
+            low_char = '0' + low;
+        } else {
+            low_char = 'A' + (low - 10);
+        }
+        if (out_len >= out->maxLen) {
+            break;
+        }
+        out->str[out_len++] = low_char;
+    }
+    out->len = out_len;
 }
 
 #define MAX_STACK_SIZE 8
@@ -675,7 +870,7 @@ static void apply_op(uint8_t op, OperandStack* os) {
     push_operand(os, res);
 }
 
-int16_t evaluateTheExpression(const uint8_t* expr, uint16_t var[]) {
+int16_t evaluateTheExpression(const uint8_t* expr, uint16_t var[256]) {
     OperandStack op_stack;
     OperatorStack oper_stack;
     init_operand(&op_stack);

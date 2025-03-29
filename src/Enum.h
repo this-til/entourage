@@ -64,13 +64,14 @@ enum TrafficLightModel {
 
 enum K210Color {
     K_NONE = 0x00,
-    K_WHITE = 0x01,
-    K_BLACK = 0x02,
-    K_RED = 0x03,
-    K_GREEN = 0x04,
-    K_YELLOW = 0x05,
-    //TODO 未实现
-    K_BLUE = 0x06,
+    K_RED = 0x01,
+    K_GREEN = 0x02,
+    K_BLUE = 0x03,
+    K_YELLOW = 0x04,
+    K_MAGENTA = 0x05,
+    K_CYAN = 0x06,
+    K_BLACK = 0x07,
+    K_WHITE = 0x08
 };
 
 enum PageTurningMode {

@@ -6,7 +6,7 @@
 
 
 CarTest carTest;
-K230Test k230Test;
+K210Test k210Test;
 
 /*void trimCarTest() {
 
@@ -121,10 +121,24 @@ void CarTest::advanceCorrectionTest() {
     k210.setTrackModel(false);
 }
 
-K230Test::K230Test() {}
+void CarTest::reverseIntoTheCarportTest() {
+    k210.setCameraSteeringGearAngle(-55);
+    k210.setTrackModel(TRACK_MIDDLE);
+    car.reverseIntoTheCarport(&carportA, 2);
+    k210.setTrackModel(false);
+}
+
+void CarTest::trimCarByLineTest() {
+    k210.setCameraSteeringGearAngle(-55);
+    k210.setTrackModel(TRACK_MIDDLE);
+    car.trimCarByLine();
+    k210.setTrackModel(false);
+}
+
+K210Test::K210Test() {}
 
 
-void K230Test::qrRecognizeTest() {
+void K210Test::qrRecognizeTest() {
     k210.setCameraSteeringGearAngle(0);
     k210.setTrackModel(0);
     uint8_t c = 0;
@@ -143,9 +157,9 @@ void K230Test::qrRecognizeTest() {
             logObj(qrMessageArray[i].qrColor);
 
             Serial.print("  Data (ASCII): ");
-            for (int j = 0; j < qrMessageArray[i].messageLen; j++) {
-                char c = qrMessageArray[i].message[j];
-                Serial.print((c >= 32 && c <= 126) ? c : '?'); // 只打印可打印字符
+            for (int j = 0; j < qrMessageArray[i].str.len; j++) {
+                char ch = qrMessageArray[i].str.str[j];
+                Serial.print((ch >= 32 && ch <= 126) ? ch : '?'); // 只打印可打印字符
             }
             Serial.println();
         }
